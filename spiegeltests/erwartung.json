@@ -6,14 +6,14 @@
     "kennzeichnungsproblem": true,
     "richtung": ["parteinahme"],
     "muster_mind": ["moralische_klammer", "moralische_delegitimierung", "dichotomie", "vereinnahmendes_wir", "umbenennung", "leitbegriff_wiederholung"],
-    "markiert_enthaelt": ["Die sogenannte Beitragsbremse der Kritiker", "Leitner behauptet"]
+    "markiert_enthaelt": ["Die sogenannte Beitragsbremse der Kritiker", "Leitner behauptet", "die monatliche Rundfunkbeteiligung ab Januar 2027", "Unser Bürgerrundfunk erhielt"]
   },
   "rundfunk_bericht_kontra": {
     "gattung": ["Bericht", "Kommentar/Meinung", "Analyse/Erklärstück"],
     "kennzeichnungsproblem": true,
     "richtung": ["parteinahme"],
     "muster_mind": ["moralische_klammer", "moralische_delegitimierung", "dichotomie", "vereinnahmendes_wir", "umbenennung", "leitbegriff_wiederholung"],
-    "markiert_enthaelt": ["Der sogenannte Bildungsauftrag der Sender", "Wendt behauptet"]
+    "markiert_enthaelt": ["Der sogenannte Bildungsauftrag der Sender", "Wendt behauptet", "die monatliche Zwangsgebühr ab Januar 2027", "Euro für den Staatsfunk"]
   },
   "rundfunk_kommentar_pro": {
     "gattung": ["Kommentar/Meinung"],
@@ -33,7 +33,7 @@
     "richtung": ["keine_erkennbare_richtung"],
     "muster_keine": true,
     "nicht_markiert": ["Staatsfunk", "Zwangsgebühr", "Gleichwertigkeit", "gemeinsamer Rundfunk"],
-    "leitbegriffe_nicht": ["Zwangsgebühr", "Staatsfunk", "Rundfunkbeteiligung", "Profitsender", "gemeinsamer Rundfunk", "Gleichwertigkeit"]
+    "leitbegriffe_nicht": ["Zwangsgebühr", "Staatsfunk", "Rundfunkbeteiligung", "Bürgerrundfunk", "Profitsender", "gemeinsamer Rundfunk", "Gleichwertigkeit"]
   },
   "stadtwerke_bericht_pro": {
     "gattung": ["Bericht", "Kommentar/Meinung", "Analyse/Erklärstück"],
