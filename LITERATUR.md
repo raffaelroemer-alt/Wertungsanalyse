@@ -4,7 +4,8 @@ Fachliteratur aus Kommunikationswissenschaft, Linguistik und Bias-Forschung, geo
 `addon/analyse/prompt.md`, die sie schärfen kann. Angaben ohne Link aus dem Gedächtnis: Auflage und Jahr vor dem
 Zitieren im Katalog prüfen.
 
-**Frei verfügbar:** DOCA-Handbuch, Recasens 2013, Spinde 2024, Hamborg 2019, Bachl/Vögele 2012, Pressekodex.
+**Frei verfügbar:** DOCA-Handbuch, Recasens 2013, Spinde 2024, Hamborg 2019, SemEval-2023 Task 3, Bachl/Vögele 2012,
+Pressekodex.
 
 ## Methode (Codieranweisung, Zählbasis, Vergleich der Läufe → `wertung.py`)
 
@@ -105,6 +106,16 @@ Zitieren im Katalog prüfen.
 - Fan, L. u. a. (2019): „In Plain Sight: Media Bias Through the Lens of Factual Reporting.“ *EMNLP 2019*
   (BASIL-Datensatz).
   → *lexical* vs. *informational bias* ≈ `wortwahl` vs. `auswahl`.
+- Piskorski, J., Stefanovitch, N., Da San Martino, G., Nakov, P. (2023): „SemEval-2023 Task 3: Detecting the
+  Category, the Framing, and the Persuasion Techniques in Online News in a Multi-lingual Setup.“ *Proceedings of
+  SemEval-2023*, 2343–2361. [aclanthology.org/2023.semeval-1.317](https://aclanthology.org/2023.semeval-1.317)
+  Annotierte Nachrichtenartikel in neun Sprachen, darunter **Deutsch**; drei Teilaufgaben:
+  → Gattung (Meinung, Bericht, Satire) ≈ Schritt 1 und `kennzeichnungsproblem`.
+  → 14 allgemeine Frames (nach dem Policy Frames Codebook von Boydstun u. a.) als Gegenstück zu Entman und
+  Semetko/Valkenburg, Grundlage für Schritt 4 und 5.
+  → 23 Überzeugungstechniken in 6 Gruppen, absatzweise annotiert; Kandidaten für weitere `strategische_muster`
+  (Angstappell, Sündenbock, Mitläufer-Appell, falsche Dringlichkeit). Werkzeuge wie Semblen ordnen ihre Befunde
+  nach dieser Art von Taxonomie, also nach Technik statt nach Ort im Text wie dieser Prompt.
 
 ## Einstieg
 
