@@ -49,7 +49,33 @@ mit einer Marke am Zeilenanfang kennzeichnen: `[Bildunterschrift]`, `[Kasten]`, 
 Das Schema erzwingt Felder und Werte, aber nicht die Zitatregeln. `pruefung` in jeder Ergebnisdatei nennt:
 Zitate, die nicht wörtlich im Artikel stehen (verglichen nach Vereinheitlichung von Anführungszeichen, Strichen,
 Leerraum und Groß/Klein – dieselbe Regel nutzt das Addon), Zitate über zehn Wörter, mehrdeutige Zitate,
-Richtungsbelege ohne Markierung, Teilwerte ohne Markierung und umgekehrt.
+Richtungsbelege ohne Markierung, Teilwerte ohne Markierung und umgekehrt. Für die strategischen Muster außerdem:
+Belege, die nicht im Artikel stehen oder über zehn Wörter haben, Muster ohne Beleg, mehr als acht Leitbegriffe.
+Für das Stimmenverzeichnis: erstes Vorkommen nicht im Artikel oder über zehn Wörter, Stimmen ohne Aussage,
+mehr zugeschriebene Aussagen als Sätze, mehr als fünf Akteure ohne Stimme.
+
+### Wer kommt zu Wort
+
+Ebenfalls getrennt von Teilwerten und Kennzahl legt der Prompt ein Verzeichnis der Stimmen an (nach Hagens
+„opportunen Zeugen“, siehe `LITERATUR.md`): jede Person oder Institution, der der Text eine Aussage zuschreibt, mit
+Typ, Zahl der Aussagen, Position zur Streitfrage (gleicher Wortlaut für gleiche Haltung) und erstem Vorkommen.
+Dazu bis zu fünf Akteure, die der Text als beschuldigt, betroffen oder entscheidend nennt, die aber nicht zu Wort
+kommen, mit Vermerk, ob laut Text eine Stellungnahme angefragt oder abgelehnt wurde. Nur textintern: Wer im Text
+nicht vorkommt, gilt nicht als fehlend. `uebersicht.md` zeigt das kurz als `7/21, 2 Pos., 1 ohne`
+(Stimmen/Aussagen, Positionen außer „ohne Position“, Akteure ohne Stimme).
+
+### Strategische Muster
+
+Getrennt von Teilwerten und Kennzahl prüft der Prompt sechs Bauformen gezielter Überzeugungskommunikation
+(abgeleitet aus einem Framing-Leitfaden, umgekehrt als Erkennungsmerkmale): moralische Klammer (Kl),
+moralische Delegitimierung (De), Dichotomie (Di), vereinnahmendes Wir (Wir), Umbenennung (Um),
+Leitbegriff-Wiederholung (Wh). Ein Muster beschreibt den Bau des Textes, nicht eine Absicht. Dazu nennt das
+Modell bis zu acht wertende Leitbegriffe in Grundform.
+
+`uebersicht.md` zeigt die Muster je Artikel (`?` hinter dem Kürzel = strittig, `–` = keine, `?` allein = Analyse
+aus der Zeit vor den Mustern) und listet Leitbegriffe, die in mindestens zwei Artikeln vorkommen, mit Anzahl je
+Quelle (Domain aus der Zeile `URL: …`). Gehäufte Begriffe in einer Quelle sind ein Hinweis auf eine Sprachregelung,
+kein Beleg: Agenturvorlagen und Begriffe aus der Debatte selbst führen zum selben Bild.
 
 ### Vergleich zweier Läufe
 
@@ -62,7 +88,8 @@ eine in der anderen steckt oder sie mindestens die Hälfte der Wörter teilen; d
 ### Laden
 
 1. In Chrome `chrome://extensions` öffnen, oben rechts **Entwicklermodus** einschalten.
-2. **Entpackte Erweiterung laden** → Ordner `C:\Users\Neu\Wertungsanalyse\addon` wählen.
+2. **Entpackte Erweiterung laden** → Ordner `%USERPROFILE%\Wertungsanalyse\addon` wählen (je PC verschieden, z. B. `C:\Users\Neu\…`
+   oder `C:\Users\raffa\…`).
 3. Über das Puzzle-Symbol die „Wertungsanalyse“ an die Symbolleiste anheften.
 4. Rechtsklick aufs Symbol → **Optionen**: API-Schlüssel eintragen und speichern. Modell und effort
    (Vorgabe Opus 5.5, `high`) lassen sich dort ändern.
@@ -76,6 +103,11 @@ Nach Änderungen am Code auf `chrome://extensions` beim Addon auf ↻ klicken un
 - Farben: Wortwahl orange, epistemische Rahmung violett, Quellen blau, Auswahl grün, Überschrift rot.
   Gestrichelt = strittig, gepunktet = nur struktureller Befund. Überfahren zeigt Begründung und neutrale Alternative,
   ein Klick auf eine Fundstelle in der Leiste springt hin.
+- Der Abschnitt „Strategische Muster“ nennt die Muster mit Begründung und Belegen. Ein Klick auf einen Beleg springt
+  hin und hebt ihn kurz gelb hervor (die Belege werden nicht dauerhaft markiert). Gemerkte Ergebnisse aus der Zeit
+  vor den Mustern zeigen dort einen Hinweis; ↻ analysiert neu.
+- „Wer kommt zu Wort“ zeigt die Aussagen je Position als Balken, je Herkunft (Regierung, Wissenschaft …), die
+  Stimmen selbst (Klick springt zum ersten Vorkommen) und Genannte ohne eigene Aussage.
 - Fehlermeldungen in der Leiste: kein Artikel erkannt (Knopf „Ganze Seite analysieren“), Schlüssel fehlt/ungültig,
   Guthaben leer, Modell unbekannt, Ratenlimit, API gestört; nicht gefundene Fundstellen stehen mit ⚠ in der Liste.
 - Der Schlüssel liegt nur in `chrome.storage.local` dieses Browserprofils und geht nur an `api.anthropic.com`.

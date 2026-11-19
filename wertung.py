@@ -46,6 +46,10 @@ PREISE = {
     "claude-fable-5-2": (8.00, 40.00, 0.20),
 }
 MIN_SAETZE_FUER_ANTEIL = 15
+MUSTER_KURZ = {"moralische_klammer": "Kl", "moralische_delegitimierung": "De", "dichotomie": "Di",
+               "vereinnahmendes_wir": "Wir", "umbenennung": "Um", "leitbegriff_wiederholung": "Wh"}
+MAX_LEITBEGRIFFE = 8
+MAX_OHNE_STIMME = 5
 
 
 # ---------------------------------------------------------------- Zitate prüfen
@@ -99,6 +103,22 @@ def pruefen(analyse: dict, artikeltext: str) -> dict:
     wert_ohne = [d for d in DIMENSIONEN if tw[d]["wert"] > 0 and zaehlend[d] == 0]
     markierung_ohne = [d for d in DIMENSIONEN if tw[d]["wert"] == 0 and zaehlend[d] > 0]
     k = analyse["kennzahl"]
+    sm = muster_von(analyse)
+    muster_nicht_gefunden, muster_zu_lang = [], []
+    for mu in sm["muster"]:
+        for b in mu["belege"]:
+            if not normalisieren(b) or normalisieren(b) not in norm:
+                muster_nicht_gefunden.append(b)
+            if len(b.split()) > 10:
+                muster_zu_lang.append(b)
+    st = stimmen_von(analyse)
+    stimmen_nicht_gefunden, stimmen_zu_lang = [], []
+    for sm_ in st["liste"]:
+        b = sm_["erstes_vorkommen"]
+        if not normalisieren(b) or normalisieren(b) not in norm:
+            stimmen_nicht_gefunden.append(b)
+        if len(b.split()) > 10:
+            stimmen_zu_lang.append(b)
     return {
         "markierungen": len(analyse["markierungen"]),
         "zitate_nicht_gefunden": nicht_gefunden,
@@ -108,7 +128,57 @@ def pruefen(analyse: dict, artikeltext: str) -> dict:
         "teilwert_ohne_markierung": wert_ohne,
         "markierung_bei_teilwert_0": markierung_ohne,
         "kennzahl_unstimmig": k["markiert"] > k["gesamt"] or k["markiert"] + k["strittig"] > k["gesamt"],
+        "muster_belege_nicht_gefunden": muster_nicht_gefunden,
+        "muster_belege_zu_lang": muster_zu_lang,
+        "muster_ohne_beleg": [mu["art"] for mu in sm["muster"] if not mu["belege"]],
+        "leitbegriffe_zu_viele": len(sm["leitbegriffe"]) > MAX_LEITBEGRIFFE,
+        "stimmen_vorkommen_nicht_gefunden": stimmen_nicht_gefunden,
+        "stimmen_vorkommen_zu_lang": stimmen_zu_lang,
+        "stimmen_ohne_aussage": [x["sprecher"] for x in st["liste"] if x["aussagen"] < 1],
+        "stimmen_aussagen_ueber_gesamt": sum(x["aussagen"] for x in st["liste"]) > k["gesamt"] > 0,
+        "ohne_stimme_zu_viele": len(st["ohne_stimme"]) > MAX_OHNE_STIMME,
     }
+
+
+def muster_von(analyse: dict) -> dict:
+    """Strategische Muster; ältere Ergebnisse ohne das Feld gelten als 'keine Muster'."""
+    return analyse.get("strategische_muster") or {"muster": [], "leitbegriffe": []}
+
+
+def muster_text(analyse: dict) -> str:
+    """Kurzform wie 'Di, Um, Wir?' (Fragezeichen = strittig), '–' = keine, '?' = ältere Analyse ohne Muster."""
+    if "strategische_muster" not in analyse:
+        return "?"
+    teile = []
+    for mu in analyse["strategische_muster"]["muster"]:
+        t = MUSTER_KURZ[mu["art"]] + ("?" if mu["strittig"] else "")
+        if t not in teile:
+            teile.append(t)
+    return ", ".join(teile) or "–"
+
+
+def stimmen_von(analyse: dict) -> dict:
+    """Verzeichnis der Stimmen; ältere Ergebnisse ohne das Feld gelten als leer."""
+    return analyse.get("stimmen") or {"liste": [], "ohne_stimme": []}
+
+
+def stimmen_text(analyse: dict) -> str:
+    """Kurzform wie '7/21, 2 Pos., 1 ohne': Stimmen/Aussagen, Positionen außer 'ohne Position', Akteure ohne Stimme.
+
+    '?' = ältere Analyse ohne Verzeichnis.
+    """
+    if "stimmen" not in analyse:
+        return "?"
+    st = analyse["stimmen"]
+    if not st["liste"] and not st["ohne_stimme"]:
+        return "–"
+    teile = [f"{len(st['liste'])}/{sum(x['aussagen'] for x in st['liste'])}"]
+    positionen = {x["position"].strip().lower() for x in st["liste"]} - {"ohne position"}
+    if positionen:
+        teile.append(f"{len(positionen)} Pos.")
+    if st["ohne_stimme"]:
+        teile.append(f"{len(st['ohne_stimme'])} ohne")
+    return ", ".join(teile)
 
 
 def kennzahl_text(k: dict) -> str:
@@ -206,6 +276,10 @@ def vergleichen(a: dict, b: dict) -> dict:
         "kennzahl": [kennzahl_text(a["kennzahl"]), kennzahl_text(b["kennzahl"])],
         "richtung_gleich": a["richtung"]["einordnung"] == b["richtung"]["einordnung"],
         "richtung": [a["richtung"]["einordnung"], b["richtung"]["einordnung"]],
+        "muster": [muster_text(a), muster_text(b)],
+        "muster_gleich": ({m["art"] for m in muster_von(a)["muster"]} == {m["art"] for m in muster_von(b)["muster"]}
+                          and ("strategische_muster" in a) == ("strategische_muster" in b)),
+        "stimmen": [stimmen_text(a), stimmen_text(b)],
     }
 
 
@@ -275,15 +349,74 @@ def richtung_text(r: dict) -> str:
             "keine_erkennbare_richtung": "keine erkennbare Richtung"}[r["einordnung"]]
 
 
+def quelle_von(datei: Path) -> str:
+    """Domain aus der Zeile 'URL: …' am Anfang der Artikeldatei, sonst '?'."""
+    try:
+        with datei.open(encoding="utf-8-sig") as f:
+            for _ in range(3):
+                treffer = re.match(r"\s*URL:\s*https?://([^/\s]+)", f.readline())
+                if treffer:
+                    return treffer.group(1).lower().removeprefix("www.")
+    except OSError:
+        pass
+    return "?"
+
+
+def wiederkehrende_leitbegriffe(alle: dict[str, list[dict]], quellen: dict[str, str]) -> list[str]:
+    """Leitbegriffe, die in mindestens zwei Artikeln vorkommen (Vereinigung aller Läufe je Artikel).
+
+    Dasselbe wertende Wort in mehreren Texten einer Quelle ist ein Hinweis auf eine Sprachregelung,
+    kein Beweis: Zufall, gemeinsame Agenturvorlage oder ein Begriff aus der Debatte selbst sind möglich.
+    """
+    fundorte: dict[str, set[str]] = {}
+    schreibweisen: dict[str, dict[str, int]] = {}
+    for artikel, laeufe in alle.items():
+        for lauf in laeufe:
+            for begriff in muster_von(lauf["analyse"])["leitbegriffe"]:
+                schl = normalisieren(begriff).strip("\"' ")
+                if not schl:
+                    continue
+                fundorte.setdefault(schl, set()).add(artikel)
+                sw = schreibweisen.setdefault(schl, {})
+                sw[begriff.strip()] = sw.get(begriff.strip(), 0) + 1
+    mehrfach = [(schl, sorted(art)) for schl, art in fundorte.items() if len(art) >= 2]
+    if not mehrfach:
+        return []
+
+    def je_quelle(artikel: list[str]) -> dict[str, int]:
+        zaehler: dict[str, int] = {}
+        for a in artikel:
+            zaehler[quellen[a]] = zaehler.get(quellen[a], 0) + 1
+        return zaehler
+
+    mehrfach.sort(key=lambda x: (-max(je_quelle(x[1]).values()), -len(x[1]), x[0]))
+    zeilen = ["", "## Wiederkehrende Leitbegriffe über mehrere Artikel", "",
+              "Wertende Schlüsselbegriffe, die das Modell in mindestens zwei Artikeln genannt hat (alle Läufe). "
+              "Häufung in einer Quelle kann auf eine Sprachregelung hindeuten; sie belegt sie nicht.", "",
+              "| Begriff | Artikel | je Quelle | Artikel |", "|---|---|---|---|"]
+    for schl, artikel in mehrfach:
+        anzeige = max(schreibweisen[schl].items(), key=lambda kv: kv[1])[0]
+        q = je_quelle(artikel)
+        q_text = ", ".join(f"{k} {v}" for k, v in sorted(q.items(), key=lambda kv: (-kv[1], kv[0])))
+        zeilen.append(f"| {anzeige} | {len(artikel)} | {q_text} | {', '.join(artikel)} |")
+    return zeilen
+
+
 def bericht(dateien: list[Path], ergebnisse: Path) -> str:
     zeilen = ["# Wertungsanalyse – Übersicht", "",
               f"Stand {datetime.now():%d.%m.%Y %H:%M}. Teilwerte W/E/Q/A/Ü = Wortwahl, epistemische Rahmung, "
               "Quellen, Auswahl, Überschrift (0–4). Kennzahl = markierte/alle Sätze, Anteil erst ab "
-              f"{MIN_SAETZE_FUER_ANTEIL} Sätzen.", "",
+              f"{MIN_SAETZE_FUER_ANTEIL} Sätzen. Muster: Kl moralische Klammer, De moralische Delegitimierung, "
+              "Di Dichotomie, Wir vereinnahmendes Wir, Um Umbenennung, Wh Leitbegriff-Wiederholung; "
+              "? = strittig, – = keine, ? allein = Analyse vor Einführung der Muster. "
+              "Stimmen: Stimmen/zugeschriebene Aussagen, Zahl der Positionen (ohne ‚ohne Position‘), "
+              "Akteure ohne Stimme; ? = Analyse vor Einführung des Verzeichnisses.", "",
               "## Lauf 1 je Artikel", "",
-              "| Artikel | Gattung | Kennz.-Problem | W | E | Q | A | Ü | Kennzahl | Richtung | Zitate nicht gefunden | Kosten |",
-              "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+              "| Artikel | Gattung | Kennz.-Problem | W | E | Q | A | Ü | Kennzahl | Richtung | Muster | Stimmen | Zitate nicht gefunden | Kosten |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     vergleiche, kosten_summe = [], 0.0
+    alle_laeufe: dict[str, list[dict]] = {}
+    quellen: dict[str, str] = {}
     for datei in dateien:
         laeufe = []
         nr = 1
@@ -291,8 +424,10 @@ def bericht(dateien: list[Path], ergebnisse: Path) -> str:
             laeufe.append(json.loads(lauf_pfad(ergebnisse, datei, nr).read_text(encoding="utf-8")))
             nr += 1
         if not laeufe:
-            zeilen.append(f"| {datei.stem} | – noch nicht analysiert – | | | | | | | | | | |")
+            zeilen.append(f"| {datei.stem} | – noch nicht analysiert – | | | | | | | | | | | | |")
             continue
+        alle_laeufe[datei.stem] = laeufe
+        quellen[datei.stem] = quelle_von(datei)
         kosten_summe += sum(l["meta"].get("kosten_usd_ca") or 0 for l in laeufe)
         e = laeufe[0]
         a, p = e["analyse"], e["pruefung"]
@@ -301,7 +436,7 @@ def bericht(dateien: list[Path], ergebnisse: Path) -> str:
         zeilen.append(
             f"| {datei.stem} | {a['gattung']['art']} | {'ja' if a['kennzeichnungsproblem']['vorhanden'] else 'nein'} | "
             + " | ".join(tw)
-            + f" | {kennzahl_text(a['kennzahl'])} | {richtung_text(a['richtung'])} | "
+            + f" | {kennzahl_text(a['kennzahl'])} | {richtung_text(a['richtung'])} | {muster_text(a)} | {stimmen_text(a)} | "
             f"{len(p['zitate_nicht_gefunden'])} von {p['markierungen']} | "
             f"{'%.2f $' % kosten if kosten is not None else '?'} |")
         if len(laeufe) >= 2:
@@ -309,18 +444,21 @@ def bericht(dateien: list[Path], ergebnisse: Path) -> str:
 
     if vergleiche:
         zeilen += ["", "## Vergleich der letzten zwei Läufe", "",
-                   "| Artikel | Gattung | ΔW | ΔE | ΔQ | ΔA | ΔÜ | mittl./max. Abw. | Markierungen | gemeinsam | Jaccard | gleiche Dim. | Kennzahl | Richtung |",
-                   "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+                   "| Artikel | Gattung | ΔW | ΔE | ΔQ | ΔA | ΔÜ | mittl./max. Abw. | Markierungen | gemeinsam | Jaccard | gleiche Dim. | Kennzahl | Richtung | Muster | Stimmen |",
+                   "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
         for name, v, _ in vergleiche:
             d = v["teilwerte_delta"]
             gattung = v["gattung"][0] if v["gattung_gleich"] else " → ".join(v["gattung"])
             richtung = "gleich" if v["richtung_gleich"] else " → ".join(v["richtung"])
+            muster = "gleich" if v["muster_gleich"] else " → ".join(v["muster"])
+            stimmen = v["stimmen"][0] if v["stimmen"][0] == v["stimmen"][1] else " → ".join(v["stimmen"])
             zeilen.append(
                 f"| {name} | {gattung} | " + " | ".join(f"{d[k]:+d}" if d[k] else "0" for k in DIMENSIONEN)
                 + f" | {v['teilwerte_mittl_abw']} / {v['teilwerte_max_abw']} | {v['markierungen'][0]} / {v['markierungen'][1]}"
                 f" | {v['markierungen_gemeinsam']} | {v['markierungen_jaccard']} | "
                 f"{v['dimension_gleich_bei_gemeinsamen']}/{v['markierungen_gemeinsam']} | "
-                f"{v['kennzahl'][0]} → {v['kennzahl'][1]} | {richtung} |")
+                f"{v['kennzahl'][0]} → {v['kennzahl'][1]} | {richtung} | {muster} | {stimmen} |")
+    zeilen += wiederkehrende_leitbegriffe(alle_laeufe, quellen)
     zeilen += ["", f"Geschätzte Kosten aller gespeicherten Läufe: {kosten_summe:.2f} $"]
     return "\n".join(zeilen) + "\n"
 

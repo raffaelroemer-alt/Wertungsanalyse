@@ -28,7 +28,7 @@ Bestimme die Gattung: Agenturmeldung, Bericht, Analyse/Erklärstück, Reportage,
 
 Gehe den Text Satz für Satz durch und markiere wertende Stellen. Es gibt fünf Dimensionen:
 
-1. `wortwahl` – **Wortwahl und Konnotation:** wertende Adjektive, Verben, Metaphern, Intensivierer, Etikettierungen („Kahlschlag“ statt „Kürzung“, „Regime“, „Debakel“, „befreit“).
+1. `wortwahl` – **Wortwahl und Konnotation:** wertende Adjektive, Verben, Metaphern, Intensivierer, Etikettierungen („Kahlschlag“ statt „Kürzung“, „Regime“, „Debakel“, „befreit“). Dazu gehören auch **distanzierende Anführungszeichen und „sogenannt“** in der Stimme des Artikels, die einen Begriff oder eine Position ohne Begründung in Zweifel ziehen („die ‚Reform‘“, „der sogenannte Bürgerfunk“). Nicht markieren: wörtliche Zitate, Eigennamen, Titel und Fachbegriffe, die erkennbar zum ersten Mal eingeführt werden.
 2. `epistemisch` – **Epistemische Rahmung:** Meinung als Tatsache dargestellt. Faktive Verben („enthüllt“, „räumt ein“, „entlarvt“), Präsuppositionen, Hedges, die Behauptungen abschwächen oder verstärken. Dazu gehören auch:
    - **übernommene Begründungen:** Zweck oder Rechtfertigung eines Akteurs steht ohne Zuschreibung in der Stimme des Artikels („Zum Schutz der Industrie verteuert X …“). Alternative: „Laut X soll das …“. Gilt für jeden Akteur gleich.
    - **Motiv- und Gefühlszuschreibungen ohne Beleg** („will damit … helfen“, „sind fassungslos“).
@@ -87,7 +87,53 @@ Die Menge sagt nicht, wem die Wertung nützt. Leite die Richtung nur aus den mar
 
 In `belege` stehen die Zitate der Markierungen, auf die du dich stützt (wörtlich wie in den Markierungen). Bei `keine_erkennbare_richtung` darf `belege` leer sein.
 
-## Schritt 5: Kennzahl
+## Schritt 5: Strategische Muster
+
+Unabhängig von den Markierungen prüfst du den ganzen Text auf Bauformen gezielter Überzeugungskommunikation, wie sie Leitfäden für strategisches Framing empfehlen. **Das ist keine Aussage über Absicht.** Du stellst fest, dass der Text so gebaut ist, nicht dass jemand es so wollte; schreibe die Begründung entsprechend („Der Text …“, nie „Die Redaktion will …“). Muster zählen weder in den Teilwerten noch in der Kennzahl. In den meisten Nachrichtentexten findest du keines; eine leere Liste ist der Normalfall. Für alle Akteure und Positionen gelten dieselben Maßstäbe: Eine aufwertende Neuprägung ist genauso ein Muster wie ein abwertender Kampfbegriff.
+
+Es zählt nur, was in der Stimme des Textes steht. Muster in sauber zugeschriebenen Zitaten Dritter sind keine Muster des Textes, es sei denn, der Text übernimmt sie in die eigene Stimme. In Kommentaren, Glossen, Pressemitteilungen und Behördenkommunikation sind solche Muster gattungstypisch; melde sie trotzdem nach denselben Regeln.
+
+Mustertypen (`art`):
+- `moralische_klammer`: Der Text beginnt mit einer moralischen Prämisse oder einem Werturteil, bringt dann Fakten und schließt mit derselben Prämisse. Die Fakten erscheinen so als Beleg für ein vorab gesetztes Urteil. Belege: mindestens eine Stelle vom Anfang und eine vom Ende.
+- `moralische_delegitimierung`: Eine Position oder ein Akteur wird nicht als sachlich falsch, sondern als unmoralisch dargestellt („Wer X fordert, verrät …“, „bricht mit dem Prinzip …“, „will Bürger ausschließen“).
+- `dichotomie`: Kontrastformeln, die zwei Lager als moralische Gegensätze gegenüberstellen („X statt Y“, „Die einen wollen …, wir wollen …“, „Bürger oder Kunde?“). Dass ein Bericht zwei Positionen nebeneinanderstellt, ist keine Dichotomie.
+- `vereinnahmendes_wir`: „wir“, „uns“, „unser“ oder direkte Anrede („Ihre Kinder“, „du“), mit denen der Text die Leser einer Seite zuschlägt. Kein Muster ist das allgemeine Wir („wir alle kennen …“) ohne Bezug zu einer Streitfrage.
+- `umbenennung`: Ein üblicher, neutraler Begriff wird durch eine wertende Neuprägung ersetzt. Nenne in der Begründung den üblichen Begriff („statt ‚Rundfunkbeitrag‘“). Ein Kampfbegriff, der schon als `wortwahl` markiert ist, wird hier nur genannt, wenn er als Ersatz eines eingeführten Begriffs dient.
+- `leitbegriff_wiederholung`: Derselbe wertende Begriff oder dieselbe Formel kehrt so oft wieder, dass er als Schlagwort wirkt: mindestens dreimal im Text oder zweimal an hervorgehobener Stelle (etwa Überschrift und Schlusssatz). Belege: die einzelnen Vorkommen.
+
+Felder je Muster:
+- `belege`: ein bis vier Zitate nach den Zitatregeln (zeichengenau, höchstens zehn Wörter, innerhalb eines Satzes). Sie dürfen, müssen aber nicht unter den Markierungen stehen.
+- `begruendung`: ein bis zwei Sätze, worin das Muster besteht.
+- `strittig`: true, wenn die Einordnung vom Standpunkt abhängt oder du unsicher bist.
+
+Im Zweifel kein Muster. Jedes Muster braucht mindestens einen Beleg.
+
+`leitbegriffe`: bis zu acht wertende Schlüsselbegriffe des Textes, die in nicht strittigen Markierungen (`wortwahl`, `epistemisch`, `quellen`) oder in den Belegen der Muster vorkommen. Jeweils in Grundform (Substantive im Nominativ Singular, Verben im Infinitiv), höchstens drei Wörter, ohne Anführungszeichen. Keine Namen, keine neutralen Fachbegriffe. Sie dienen dem Vergleich mehrerer Artikel; bei `kein_artikel` und `nur_zusammenfassung` bleibt die Liste leer, ebenso `muster`.
+
+## Schritt 6: Wer kommt zu Wort
+
+Du legst ein Verzeichnis der Stimmen an: wer im Text etwas sagen darf, wie oft und für welche Position. Das ist eine Bestandsaufnahme, keine Bewertung. Das Verzeichnis zählt weder in den Teilwerten noch in der Kennzahl. Ergibt sich daraus eine einseitige Auswahl, markierst du sie wie bisher unter `quellen` oder `auswahl` (dort mit `nur_struktur`).
+
+**Wer eine Stimme ist:** jede Person, Gruppe oder Institution, der der Text eine Aussage zuschreibt, ob wörtlich zitiert, in indirekter Rede oder mit „laut“, „nach Angaben von“, „wie X mitteilte“. Auch Studien, Statistiken und Dokumente zählen; Sprecher ist dann die herausgebende Stelle („Statistisches Bundesamt“, „Institut für …“). Keine Stimmen sind die Stimme des Artikels selbst, die Autorin oder der Autor und Nachrichtenagenturen als Herkunftsangabe („dpa“ am Anfang). Im Interview ist die befragte Person eine Stimme, die Fragen der Redaktion sind es nicht.
+
+**Zusammenfassen:** Eine Person oder Institution ist ein Eintrag, auch wenn sie mehrfach spricht. Pressesprecher und Institution sind ein Eintrag („Innenministerium“, nicht „Sprecher des Innenministeriums“). Bei mehr als 15 Stimmen fasse Einzelpersonen gleichen Typs und gleicher Position zusammen („drei Anwohner“).
+
+Felder je Stimme (`liste`, in der Reihenfolge des ersten Auftretens):
+- `sprecher`: Name oder Bezeichnung wie im Text, mit Funktion, wenn der Text sie nennt („Innenministerin Müller“, „ein Anwohner“).
+- `typ`: genau einer von `regierung_verwaltung` (Regierungen, Ministerien, Behörden, auch ausländische), `partei_parlament` (Parteien, Abgeordnete, Fraktionen, Kandidaten), `justiz` (Gerichte, Staatsanwaltschaft, Anwälte), `sicherheit` (Polizei, Militär, Nachrichtendienste), `wirtschaft` (Unternehmen und ihre Vertreter), `verband` (Wirtschafts- und Berufsverbände, Gewerkschaften, Interessengruppen), `zivilgesellschaft` (Vereine, Initiativen, NGOs, Kirchen), `wissenschaft` (Forschende, Institute, Sachverständige), `internationale_organisation` (UN, EU-Organe, NATO und ähnliche), `medien` (andere Medien, Journalisten), `betroffene` (Bürger, Augenzeugen, Betroffene, Angehörige), `sonstige`.
+- `anonym`: true, wenn der Text die Stimme nicht namentlich oder institutionell benennt („aus Regierungskreisen“, „ein Insider“, „Kritiker“).
+- `aussagen`: Anzahl der Sätze der Zählbasis, in denen dieser Stimme eine Aussage zugeschrieben wird (mindestens 1).
+- `position`: die Haltung der Stimme zur zentralen Streitfrage des Textes, kurz und neutral in eigenen Worten („für die Kürzung“, „gegen die Kürzung“). Verwende für dieselbe Haltung bei allen Stimmen denselben Wortlaut, damit sie sich zusammenfassen lassen. Stimmen, die nur Sachverhalte mitteilen oder keine Haltung erkennen lassen, und Texte ohne Streitfrage: `ohne Position`. Keine Links-rechts-Einordnung.
+- `erstes_vorkommen`: Zitat nach den Zitatregeln aus dem Satz, in dem die Stimme zum ersten Mal mit einer Aussage vorkommt, möglichst mit ihrer Bezeichnung („sagte Innenministerin Müller am Dienstag“).
+
+**Ohne Stimme** (`ohne_stimme`): Akteure, die der Text selbst als beschuldigt, kritisiert, unmittelbar betroffen oder als Entscheidungsträger der Streitfrage nennt, die aber keine eigene Aussage im Text haben. Höchstens fünf, die wichtigsten zuerst. Nenne nur Akteure, die im Text vorkommen; Gruppen, die der Text gar nicht erwähnt, gehören nicht hierher (keine externen Maßstäbe, was „fehlen“ müsste). Felder:
+- `akteur`: Bezeichnung wie im Text.
+- `rolle`: kurz, warum er im Text relevant ist („wird der Untreue beschuldigt“, „von der Kürzung betroffen“).
+- `vermerk`: `angefragt_ohne_antwort`, wenn der Text sagt, dass eine Stellungnahme angefragt wurde, aber nicht kam („war nicht zu erreichen“); `aeusserung_abgelehnt`, wenn der Akteur sich laut Text nicht äußern wollte; sonst `kein_vermerk`.
+
+Bei `kein_artikel` und `nur_zusammenfassung` bleiben `liste` und `ohne_stimme` leer.
+
+## Schritt 7: Kennzahl
 
 Zähle die Sätze der **Zählbasis**: Überschrift, Unterzeile, Vorspann, Zwischenüberschriften und Fließtext. Eine Überschrift oder Zwischenüberschrift zählt als ein Satz, auch ohne Punkt. Nicht zur Zählbasis gehören Bildunterschriften, Info- und Methodik-Kästen, Linkteaser, Navigation, Autorenzeilen, Quellenlisten.
 
@@ -97,11 +143,11 @@ Zähle die Sätze der **Zählbasis**: Überschrift, Unterzeile, Vorspann, Zwisch
 
 Hat die Zählbasis weniger als 15 Sätze, schreibe in die Hinweise, dass wegen der Kürze nur absolute Zahlen aussagekräftig sind. Einen Anteil rechnest du nie selbst aus; das übernimmt die Anzeige.
 
-## Schritt 6: Neutrale Fassung
+## Schritt 8: Neutrale Fassung
 
 Drei bis sechs Sätze in eigenen Worten: nur die Sachaussagen, mit Zuschreibung, wer was sagt, behauptet oder gemessen hat („Laut X …“, „Y kritisiert, dass …“). Wertungen entfernen oder als Position des Sprechers kennzeichnen. Keine externen Fakten ergänzen. Keine Satz-für-Satz-Umschreibung des Artikels und keine längeren wörtlichen Zitate.
 
-## Schritt 7: Hinweise
+## Schritt 9: Hinweise
 
 Kurze Hinweise zu Unsicherheiten, fehlendem Kontext, Stellen, deren Beurteilung vom Standpunkt abhängt, zur Kennzeichnung, zur Textlage und zur Kürze des Textes. Keine Wiederholung der Markierungen. Wenn es nichts zu sagen gibt, bleibt die Liste leer.
 

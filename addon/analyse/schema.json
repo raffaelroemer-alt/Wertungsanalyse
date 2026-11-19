@@ -1,7 +1,7 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["textlage", "gattung", "kennzeichnungsproblem", "markierungen", "teilwerte", "richtung", "kennzahl", "neutrale_fassung", "hinweise"],
+  "required": ["textlage", "gattung", "kennzeichnungsproblem", "markierungen", "teilwerte", "richtung", "strategische_muster", "stimmen", "kennzahl", "neutrale_fassung", "hinweise"],
   "properties": {
     "textlage": {
       "type": "string",
@@ -67,6 +67,64 @@
         "zulasten": {"type": "array", "items": {"type": "string"}},
         "belege": {"type": "array", "items": {"type": "string"}},
         "begruendung": {"type": "string"}
+      }
+    },
+    "strategische_muster": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["muster", "leitbegriffe"],
+      "properties": {
+        "muster": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["art", "belege", "begruendung", "strittig"],
+            "properties": {
+              "art": {"type": "string", "enum": ["moralische_klammer", "moralische_delegitimierung", "dichotomie", "vereinnahmendes_wir", "umbenennung", "leitbegriff_wiederholung"]},
+              "belege": {"type": "array", "items": {"type": "string", "description": "zeichengenau aus dem Artikel, höchstens zehn Wörter"}},
+              "begruendung": {"type": "string"},
+              "strittig": {"type": "boolean"}
+            }
+          }
+        },
+        "leitbegriffe": {"type": "array", "items": {"type": "string", "description": "wertender Schlüsselbegriff in Grundform, höchstens drei Wörter"}}
+      }
+    },
+    "stimmen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["liste", "ohne_stimme"],
+      "properties": {
+        "liste": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sprecher", "typ", "anonym", "aussagen", "position", "erstes_vorkommen"],
+            "properties": {
+              "sprecher": {"type": "string"},
+              "typ": {"type": "string", "enum": ["regierung_verwaltung", "partei_parlament", "justiz", "sicherheit", "wirtschaft", "verband", "zivilgesellschaft", "wissenschaft", "internationale_organisation", "medien", "betroffene", "sonstige"]},
+              "anonym": {"type": "boolean"},
+              "aussagen": {"type": "integer"},
+              "position": {"type": "string", "description": "Haltung zur Streitfrage, gleicher Wortlaut für gleiche Haltung, sonst 'ohne Position'"},
+              "erstes_vorkommen": {"type": "string", "description": "zeichengenau aus dem Artikel, höchstens zehn Wörter"}
+            }
+          }
+        },
+        "ohne_stimme": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["akteur", "rolle", "vermerk"],
+            "properties": {
+              "akteur": {"type": "string"},
+              "rolle": {"type": "string"},
+              "vermerk": {"type": "string", "enum": ["kein_vermerk", "angefragt_ohne_antwort", "aeusserung_abgelehnt"]}
+            }
+          }
+        }
       }
     },
     "kennzahl": {

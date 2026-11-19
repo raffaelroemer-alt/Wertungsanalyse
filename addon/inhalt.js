@@ -11,7 +11,22 @@
     auswahl: { name: "Auswahl & Gewichtung", farbe: "rgb(47,158,68)" },
     ueberschrift: { name: "Überschrift & Vorspann", farbe: "rgb(224,49,49)" },
   };
-  const GATTUNG_KOMMENTAR = new Set(["Kommentar/Meinung", "Glosse"]);
+  const MUSTER = {
+    moralische_klammer: "Moralische Klammer",
+    moralische_delegitimierung: "Moralische Delegitimierung",
+    dichotomie: "Dichotomie",
+    vereinnahmendes_wir: "Vereinnahmendes Wir",
+    umbenennung: "Umbenennung",
+    leitbegriff_wiederholung: "Leitbegriff-Wiederholung",
+  };
+  const STIMMEN_TYP = {
+    regierung_verwaltung: "Regierung/Verwaltung", partei_parlament: "Partei/Parlament", justiz: "Justiz",
+    sicherheit: "Polizei/Militär", wirtschaft: "Wirtschaft", verband: "Verband/Gewerkschaft",
+    zivilgesellschaft: "Zivilgesellschaft", wissenschaft: "Wissenschaft", internationale_organisation: "Internat. Organisation",
+    medien: "Medien", betroffene: "Betroffene/Bürger", sonstige: "Sonstige",
+  };
+  const VERMERK = { angefragt_ohne_antwort: "angefragt, keine Antwort", aeusserung_abgelehnt: "wollte sich nicht äußern" };
+  const GATTUNG_KOMMENTAR =new Set(["Kommentar/Meinung", "Glosse"]);
   const MIN_SAETZE_FUER_ANTEIL = 15;
 
   // ------------------------------------------------------------ Vereinheitlichung (wie wertung.py)
@@ -208,6 +223,32 @@
     return { zuordnung, bereiche };
   }
 
+  // Bereich (Range) eines Zitats im aktuellen Seitentext, ohne das DOM zu verändern; null = nicht gefunden
+  function stelleFinden(index, zitat) {
+    const t = finden(index, zitat);
+    if (!t) return null;
+    let s = t.start, e = t.ende;
+    while (s <= e && index.kn[s] < 0) s++;
+    while (e >= s && index.kn[e] < 0) e--;
+    if (s > e) return null;
+    const r = document.createRange();
+    r.setStart(index.knoten[index.kn[s]], index.off[s]);
+    r.setEnd(index.knoten[index.kn[e]], index.off[e] + 1);
+    return r;
+  }
+
+  // Belege der Muster werden nicht dauerhaft markiert, sondern auf Klick kurz hervorgehoben (CSS Custom Highlight)
+  function stelleZeigen(zitat) {
+    const r = stelleFinden(seitenIndex(), zitat);
+    if (!r) return;
+    (r.startContainer.parentElement || document.body).scrollIntoView({ behavior: "smooth", block: "center" });
+    if (window.CSS && CSS.highlights && typeof Highlight === "function") {
+      CSS.highlights.set("wa-muster", new Highlight(r));
+      clearTimeout(WA.musterZeit);
+      WA.musterZeit = setTimeout(() => CSS.highlights.delete("wa-muster"), 2500);
+    }
+  }
+
   // ------------------------------------------------------------ Seitenleiste
 
   const host = document.createElement("div");
@@ -257,6 +298,12 @@
     .tip .dim { font-weight: 600; }
     .tip .alt { color: #b9f6ca; margin-top: 3px; }
     .fuss { font-size: 11.5px; color: #777; padding-top: 10px; }
+    .muster { margin: 6px 0 10px; }
+    .pos { margin: 4px 0; }
+    .pos-kopf { display: flex; gap: 8px; }
+    .pos-kopf span:first-child { flex: 1; }
+    .pos-balken { height: 6px; border-radius: 3px; background: #555; margin-top: 2px; }
+    h3 { font-size: 12px; font-weight: 600; margin: 10px 0 2px; color: #444; }
   </style>
   <div class="leiste">
     <header>
@@ -407,6 +454,31 @@
       r.zulasten.length > 0 && el("div", {}, "zulasten: ", el("b", {}, r.zulasten.join(", "))),
       el("div", { class: "klein" }, r.begruendung)));
 
+    // Strategische Muster
+    const sm = a.strategische_muster;
+    if (!sm) {
+      abschnitte.push(el("section", {}, el("h2", {}, "Strategische Muster"),
+        el("div", { class: "klein" }, "Dieses Ergebnis stammt aus einer älteren Version ohne Musterprüfung. ↻ analysiert neu (kostet).")));
+    } else {
+      const index = sm.muster.length ? seitenIndex() : null;
+      abschnitte.push(el("section", {}, el("h2", {}, `Strategische Muster (${sm.muster.length})`),
+        sm.muster.length === 0 && el("div", {}, "Keine Muster gezielter Rahmung erkannt."),
+        sm.muster.map((mu) => el("div", { class: "muster" },
+          el("div", {}, el("b", {}, MUSTER[mu.art] || mu.art), mu.strittig && el("span", { class: "marke" }, "strittig")),
+          el("div", { class: "klein" }, mu.begruendung),
+          el("ul", {}, mu.belege.map((b) => {
+            const da = !!stelleFinden(index, b);
+            return el("li", { class: "fund" + (da ? "" : " fehlt"), onclick: () => da && stelleZeigen(b) },
+              el("span", {}, da ? "" : "⚠ ", `„${b}“`));
+          })))),
+        sm.leitbegriffe.length > 0 && el("div", { class: "klein", style: "margin-top:6px" }, "Leitbegriffe: ", sm.leitbegriffe.join(" · ")),
+        el("div", { class: "klein", style: "margin-top:6px" },
+          "Muster beschreiben, wie der Text gebaut ist, nicht was jemand beabsichtigt hat. Sie zählen nicht in Teilwerten und Kennzahl.")));
+    }
+
+    // Wer kommt zu Wort
+    abschnitte.push(stimmenAbschnitt(a.stimmen));
+
     // Neutrale Fassung
     abschnitte.push(el("section", {}, el("h2", {}, "Neutrale Fassung"), el("div", {}, a.neutrale_fassung)));
 
@@ -442,6 +514,56 @@
       + `. Analysiert am ${datum}.` + (ausSpeicher ? " Aus dem Zwischenspeicher, ohne neuen API-Aufruf." : "")));
 
     inhaltSetzen(...abschnitte);
+  }
+
+  // Verzeichnis der Stimmen: Aussagen je Position (Balken), je Typ, die Stimmen selbst, Akteure ohne Stimme
+  function stimmenAbschnitt(st) {
+    const titel = "Wer kommt zu Wort";
+    if (!st) {
+      return el("section", {}, el("h2", {}, titel),
+        el("div", { class: "klein" }, "Dieses Ergebnis stammt aus einer älteren Version ohne Stimmenverzeichnis. ↻ analysiert neu (kostet)."));
+    }
+    const liste = st.liste;
+    const summe = liste.reduce((n, s) => n + s.aussagen, 0);
+    // Positionen in der Reihenfolge ihres ersten Auftretens, gleicher Wortlaut = gleiche Position
+    const positionen = new Map();
+    for (const s of liste) {
+      const schl = s.position.trim().toLowerCase();
+      const p = positionen.get(schl) || { name: s.position.trim(), stimmen: 0, aussagen: 0 };
+      p.stimmen += 1; p.aussagen += s.aussagen;
+      positionen.set(schl, p);
+    }
+    const mitHaltung = [...positionen.keys()].some((k) => k !== "ohne position");
+    const typen = new Map();
+    for (const s of liste) typen.set(s.typ, (typen.get(s.typ) || 0) + s.aussagen);
+    const index = liste.length ? seitenIndex() : null;
+
+    return el("section", {}, el("h2", {}, titel),
+      liste.length === 0
+        ? el("div", {}, "Der Text schreibt niemandem eine Aussage zu.")
+        : el("div", { class: "gross" }, `${liste.length} ${liste.length === 1 ? "Stimme" : "Stimmen"}, ${summe} ${summe === 1 ? "Aussage" : "Aussagen"}`),
+      mitHaltung && el("h3", {}, "Aussagen nach Position"),
+      mitHaltung && [...positionen.values()].map((p) => el("div", { class: "pos" },
+        el("div", { class: "pos-kopf" }, el("span", {}, p.name),
+          el("span", { class: "klein" }, `${p.aussagen} (${p.stimmen} ${p.stimmen === 1 ? "Stimme" : "Stimmen"})`)),
+        el("div", { class: "pos-balken", style: `width:${summe ? Math.max(2, Math.round(100 * p.aussagen / summe)) : 0}%` }))),
+      liste.length > 0 && el("h3", {}, "Aussagen nach Herkunft"),
+      liste.length > 0 && el("div", { class: "klein" },
+        [...typen.entries()].sort((x, y) => y[1] - x[1]).map(([t, n]) => `${STIMMEN_TYP[t] || t} ${n}`).join(" · ")),
+      liste.length > 0 && el("h3", {}, "Stimmen"),
+      liste.length > 0 && el("ul", {}, liste.map((s) => {
+        const da = !!stelleFinden(index, s.erstes_vorkommen);
+        return el("li", { class: "fund" + (da ? "" : " fehlt"), title: `„${s.erstes_vorkommen}“`,
+          onclick: () => da && stelleZeigen(s.erstes_vorkommen) },
+          el("span", {}, da ? "" : "⚠ ", el("b", {}, s.sprecher), ` · ${s.aussagen}×`,
+            s.anonym && el("span", { class: "marke" }, "anonym"),
+            el("div", { class: "klein" }, STIMMEN_TYP[s.typ] || s.typ, mitHaltung ? ` · ${s.position}` : "")));
+      })),
+      st.ohne_stimme.length > 0 && el("h3", {}, "Genannt, aber ohne eigene Aussage"),
+      st.ohne_stimme.length > 0 && el("ul", {}, st.ohne_stimme.map((o) => el("li", {},
+        el("b", {}, o.akteur), `: ${o.rolle}`, VERMERK[o.vermerk] && el("span", { class: "marke" }, VERMERK[o.vermerk])))),
+      el("div", { class: "klein", style: "margin-top:6px" },
+        "Bestandsaufnahme aus dem Text, zählt nicht in Teilwerten und Kennzahl. Wer im Text gar nicht vorkommt, wird nicht als fehlend gewertet."));
   }
 
   function hinspringen(bi) {

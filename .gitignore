@@ -1,6 +1,7 @@
 # Artikeltexte und Analyseergebnisse (enthalten Artikelzitate) nie einchecken
 testartikel/
 ergebnisse/
+ergebnisse_medium/
 
 # Python
 .venv/
