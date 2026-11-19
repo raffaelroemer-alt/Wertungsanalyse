@@ -118,7 +118,7 @@ Rundfunkbeitrags sind frei erfunden: Namen, Zahlen, Domains (`.example`).
 Sieben Artikel × zwei Läufe = 14 API-Aufrufe (vorhandene Läufe werden nicht neu bezahlt, `--nur stadtwerke`
 analysiert nur das neue Paar). `uebersicht.md` hat dann drei zusätzliche Abschnitte:
 - **Spiegelpaare:** `<stamm>_pro` gegen `<stamm>_kontra`. Die Teilwerte werden über alle Läufe gemittelt.
-  Symmetrisch heißt: keine Dimension weicht um mehr als 1 ab, gleiche Muster (in mindestens der Hälfte der
+  Symmetrisch heißt: keine Dimension weicht um mehr als 1 ab, gleiche nicht strittige Muster (in mindestens der Hälfte der
   Läufe) und gleiches Kennzeichnungsproblem. Die Richtung muss man selbst ansehen: Sie soll gespiegelt sein.
 - **Abgleich mit `erwartung.json`:** je Artikel, in wie vielen Läufen alles erfüllt ist und was abwich
   (Gattung, Kennzeichnungsproblem, Richtung, Muster, Stellen, die markiert oder gerade nicht markiert sein müssen,
@@ -135,7 +135,7 @@ vertritt und wörtliche Zitate bleiben; was sich nur mit erfundenen Fakten oder 
 sachlich stehen und wird als „nicht gespiegelt“ genannt. Texte ohne zwei Seiten (Unfall, Wetter) sind nicht spiegelbar.
 
 Die Gegenfassung wird mit dem normalen Prompt analysiert und mit dem Original verglichen. Symmetrisch heißt: keine
-Dimension weicht um mehr als 1 ab, gleiche Muster, gleiches Kennzeichnungsproblem, gleiche Einordnung der Richtung
+Dimension weicht um mehr als 1 ab, gleiche nicht strittige Muster, gleiches Kennzeichnungsproblem, gleiche Einordnung der Richtung
 und bei Parteinahme die andere Seite begünstigt. Eine Abweichung hat zwei mögliche Ursachen: Die Analyse misst die
 Seiten ungleich, oder die Gegenfassung ist nicht gleich stark geraten. Unterscheiden lässt sich das nur durch Lesen
 der Gegenfassung.

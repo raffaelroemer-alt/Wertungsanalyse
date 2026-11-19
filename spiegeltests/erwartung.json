@@ -1,6 +1,6 @@
 {
   "_zweck": "Selbst geschriebene, frei erfundene Testtexte (Namen, Zahlen, Domains). Pro und kontra sind Satz für Satz gespiegelt: gleiche Fakten, gleiche Stimmen, gleiche Bauformen, nur die Seite wechselt. Die Analyse muss beide Seiten gleich behandeln. Der neutrale Text enthält die Kampfbegriffe beider Seiten nur in zugeschriebenen Zitaten und darf deshalb keine Muster und keine Markierungen dieser Begriffe haben.",
-  "_schluessel": "gattung/richtung: erlaubte Werte; kennzeichnungsproblem: erwarteter Wert; muster_mind: Muster, die vorkommen müssen (strittig zählt); muster_keine: keine nicht strittigen Muster; markiert_enthaelt: Stellen, die eine nicht strittige Markierung treffen müssen; nicht_markiert: Wörter, die in keiner nicht strittigen Markierung stehen dürfen; leitbegriffe_nicht: dürfen nicht unter den Leitbegriffen sein.",
+  "_schluessel": "gattung/richtung: erlaubte Werte; kennzeichnungsproblem: erwarteter Wert; muster_mind: Muster, die vorkommen müssen (strittig zählt); muster_keine: keine nicht strittigen Muster; markiert_enthaelt: Stellen, die eine nicht strittige Markierung treffen müssen; nicht_markiert: Wörter, die in keiner nicht strittigen Markierung stehen dürfen (Strukturmarkierungen mit nur_struktur ausgenommen, sie verankern nur einen Befund); leitbegriffe_nicht: dürfen nicht unter den Leitbegriffen sein.",
   "rundfunk_bericht_pro": {
     "gattung": ["Bericht", "Kommentar/Meinung", "Analyse/Erklärstück"],
     "kennzeichnungsproblem": true,

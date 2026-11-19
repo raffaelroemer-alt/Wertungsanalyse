@@ -594,8 +594,11 @@
         el("td", { class: "zahl" }, String(wo)), el("td", { class: "zahl" }, String(ws)),
         el("td", {}, Math.abs(wo - ws) > 1 ? el("span", { class: "marke" }, "abweichend") : ""));
     });
-    const arten = (x) => new Set(((x.strategische_muster || {}).muster || []).map((m) => m.art));
-    const mo = arten(a), ms = arten(s);
+    // Nur nicht strittige Muster entscheiden; Muster, die nur strittig vorkommen, werden bloß genannt (wie wertung.py)
+    const arten = (x, strittig) => new Set(((x.strategische_muster || {}).muster || [])
+      .filter((m) => !!m.strittig === strittig).map((m) => m.art));
+    const mo = arten(a, false), ms = arten(s, false);
+    const so = [...arten(a, true)].filter((x) => !mo.has(x)), ss = [...arten(s, true)].filter((x) => !ms.has(x));
     const musterGleich = mo.size === ms.size && [...mo].every((x) => ms.has(x));
     if (!musterGleich) abweichend.push("Muster");
     if (a.kennzeichnungsproblem.vorhanden !== s.kennzeichnungsproblem.vorhanden) abweichend.push("Kennzeichnung");
@@ -614,7 +617,8 @@
           : el("span", {}, el("b", {}, "Symmetrisch: "), "Die Gegenfassung wird gleich bewertet.")),
       el("table", { class: "vergleich" },
         el("tr", {}, el("th", {}, ""), el("th", {}, "Original"), el("th", {}, "Gegenf."), el("th", {}, "")), zeilen),
-      el("div", { class: "klein" }, "Muster: ", namen(mo), musterGleich ? "" : ` · Gegenfassung: ${namen(ms)}`),
+      el("div", { class: "klein" }, "Muster: ", namen(mo), musterGleich ? "" : ` · Gegenfassung: ${namen(ms)}`,
+        (so.length || ss.length) ? ` (strittig: ${namen(so)} · Gegenfassung: ${namen(ss)}; zählt nicht)` : ""),
       el("div", { class: "klein" }, "Richtung: ", richtung(a.richtung), " · Gegenfassung: ", richtung(s.richtung)),
       g.nicht_gespiegelt.length > 0 && el("div", { class: "klein", style: "margin-top:4px" },
         `Nicht gespiegelt (${g.nicht_gespiegelt.length}): `, g.nicht_gespiegelt.join(" · ")),

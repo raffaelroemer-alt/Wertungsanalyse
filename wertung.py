@@ -438,11 +438,12 @@ def erwartung_abweichungen(a: dict, e: dict) -> list[str]:
     if "richtung" in e and a["richtung"]["einordnung"] not in e["richtung"]:
         f.append(f"Richtung {a['richtung']['einordnung']}")
     zitate = [m["zitat"] for m in a["markierungen"] if not m["strittig"]]
+    wertend = [m["zitat"] for m in a["markierungen"] if not m["strittig"] and not m.get("nur_struktur")]
     for stelle in e.get("markiert_enthaelt", []):
         if not any(_passen(stelle, z) for z in zitate):
             f.append(f"nicht markiert: {stelle}")
     for wort in e.get("nicht_markiert", []):
-        if any(normalisieren(wort) in normalisieren(z) for z in zitate):
+        if any(normalisieren(wort) in normalisieren(z) for z in wertend):
             f.append(f"markiert: {wort}")
     if "strategische_muster" not in a:
         return f + ["Analyse ohne Muster (ältere Version)"]
@@ -483,11 +484,11 @@ def _zahl(x: float) -> str:
     return str(int(x)) if x == int(x) else f"{x:.1f}"
 
 
-def _muster_mehrheit(laeufe: list[dict]) -> set[str]:
-    """Musterarten, die in mindestens der Hälfte der Läufe vorkommen."""
+def _muster_mehrheit(laeufe: list[dict], nur_fest: bool = False) -> set[str]:
+    """Musterarten, die in mindestens der Hälfte der Läufe vorkommen (nur_fest: nur nicht strittige)."""
     zaehler: dict[str, int] = {}
     for lauf in laeufe:
-        for art in {m["art"] for m in muster_von(lauf["analyse"])["muster"]}:
+        for art in {m["art"] for m in muster_von(lauf["analyse"])["muster"] if not (nur_fest and m["strittig"])}:
             zaehler[art] = zaehler.get(art, 0) + 1
     return {art for art, n in zaehler.items() if 2 * n >= len(laeufe)}
 
@@ -495,8 +496,9 @@ def _muster_mehrheit(laeufe: list[dict]) -> set[str]:
 def symmetrie(a: list[dict], b: list[dict]) -> dict:
     """Vergleicht zwei Gruppen von Läufen (pro/kontra oder Original/Gegenfassung).
 
-    Teilwerte gemittelt; abweichend ist eine Dimension mit mehr als 1 Unterschied, ungleiche Muster
-    (Mehrheit der Läufe) und ungleiches Kennzeichnungsproblem.
+    Teilwerte gemittelt; abweichend ist eine Dimension mit mehr als 1 Unterschied, ungleiche nicht strittige
+    Muster (Mehrheit der Läufe) und ungleiches Kennzeichnungsproblem. Muster, die nur strittig vorkommen,
+    werden in der Zelle ausgewiesen, entscheiden aber nicht.
     """
     zellen, abweichend = [], []
     for d in DIMENSIONEN:
@@ -505,9 +507,12 @@ def symmetrie(a: list[dict], b: list[dict]) -> dict:
         zellen.append(f"{_zahl(ma)} / {_zahl(mb)}")
         if abs(ma - mb) > 1:
             abweichend.append(KURZ[d])
-    mua, mub = _muster_mehrheit(a), _muster_mehrheit(b)
+    mua, mub = _muster_mehrheit(a, nur_fest=True), _muster_mehrheit(b, nur_fest=True)
+    sta, stb = _muster_mehrheit(a) - mua, _muster_mehrheit(b) - mub
     kurz = lambda menge: ", ".join(sorted(MUSTER_KURZ[x] for x in menge)) or "–"
     muster = kurz(mua) if mua == mub else f"{kurz(mua)} / {kurz(mub)}"
+    if sta or stb:
+        muster += f" (strittig: {kurz(sta)})" if sta == stb else f" (strittig: {kurz(sta)} / {kurz(stb)})"
     if mua != mub:
         abweichend.append("Muster")
     ka = 2 * sum(l["analyse"]["kennzeichnungsproblem"]["vorhanden"] for l in a) >= len(a)
@@ -522,14 +527,15 @@ def spiegelpaare(alle: dict[str, list[dict]]) -> list[str]:
     """Vergleicht Artikel <stamm>_pro mit <stamm>_kontra: Gleiche Bauart muss gleich bewertet werden.
 
     Teilwerte gemittelt über alle Läufe; symmetrisch heißt: keine Dimension weicht um mehr als 1 ab,
-    gleiche Muster (Mehrheit der Läufe) und gleiche Einschätzung des Kennzeichnungsproblems.
+    gleiche nicht strittige Muster (Mehrheit der Läufe) und gleiche Einschätzung des Kennzeichnungsproblems.
     """
     staemme = sorted(n[:-4] for n in alle if n.endswith("_pro") and n[:-4] + "_kontra" in alle)
     if not staemme:
         return []
     zeilen = ["", "## Spiegelpaare (pro / kontra)", "",
               "Teilwerte gemittelt über alle Läufe. Symmetrisch: keine Dimension weicht um mehr als 1 ab, "
-              "gleiche Muster (in mindestens der Hälfte der Läufe), gleiches Kennzeichnungsproblem.", "",
+              "gleiche nicht strittige Muster (in mindestens der Hälfte der Läufe), gleiches Kennzeichnungsproblem. "
+              "Muster, die nur strittig vorkommen, stehen in Klammern und entscheiden nicht.", "",
               "| Paar | W | E | Q | A | Ü | Muster | Kennz.-Problem | Richtung pro | Richtung kontra | symmetrisch |",
               "|---|---|---|---|---|---|---|---|---|---|---|"]
     for stamm in staemme:
@@ -584,7 +590,7 @@ def spiegelprobe(dateien: list[Path], ergebnisse: Path, alle: dict[str, list[dic
     return ["", "## Spiegelprobe (Original / Gegenfassung)", "",
             "Die Gegenfassung vertauscht die Seiten bei gleicher Machart (spiegel_text.txt je Artikel). Teilwerte: "
             "Mittel der Original-Läufe / ein Lauf der Gegenfassung. Symmetrisch: keine Dimension weicht um mehr als 1 "
-            "ab, gleiche Muster, gleiches Kennzeichnungsproblem, gleiche Einordnung der Richtung, bei Parteinahme "
+            "ab, gleiche nicht strittige Muster, gleiches Kennzeichnungsproblem, gleiche Einordnung der Richtung, bei Parteinahme "
             "gedreht. Eine Abweichung heißt: Die Analyse misst ungleich oder die Gegenfassung ist nicht gleich stark "
             "geraten; das zeigt nur das Lesen der Gegenfassung.", "",
             "| Artikel | W | E | Q | A | Ü | Muster | Kennz.-Problem | Richtung Original | Richtung Gegenfassung "
