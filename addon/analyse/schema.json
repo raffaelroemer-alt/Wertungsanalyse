@@ -81,7 +81,7 @@
             "additionalProperties": false,
             "required": ["art", "belege", "begruendung", "strittig"],
             "properties": {
-              "art": {"type": "string", "enum": ["moralische_klammer", "moralische_delegitimierung", "dichotomie", "vereinnahmendes_wir", "umbenennung", "leitbegriff_wiederholung"]},
+              "art": {"type": "string", "enum": ["moralische_klammer", "moralische_delegitimierung", "dichotomie", "vereinnahmendes_wir", "umbenennung", "leitbegriff_wiederholung", "angstappell", "suendenbock"]},
               "belege": {"type": "array", "items": {"type": "string", "description": "zeichengenau aus dem Artikel, höchstens zehn Wörter"}},
               "begruendung": {"type": "string"},
               "strittig": {"type": "boolean"}

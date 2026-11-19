@@ -18,6 +18,8 @@
     vereinnahmendes_wir: "Vereinnahmendes Wir",
     umbenennung: "Umbenennung",
     leitbegriff_wiederholung: "Leitbegriff-Wiederholung",
+    angstappell: "Angstappell",
+    suendenbock: "Sündenbock",
   };
   const STIMMEN_TYP = {
     regierung_verwaltung: "Regierung/Verwaltung", partei_parlament: "Partei/Parlament", justiz: "Justiz",

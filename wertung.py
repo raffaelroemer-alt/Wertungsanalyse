@@ -47,7 +47,8 @@ PREISE = {
 }
 MIN_SAETZE_FUER_ANTEIL = 15
 MUSTER_KURZ = {"moralische_klammer": "Kl", "moralische_delegitimierung": "De", "dichotomie": "Di",
-               "vereinnahmendes_wir": "Wir", "umbenennung": "Um", "leitbegriff_wiederholung": "Wh"}
+               "vereinnahmendes_wir": "Wir", "umbenennung": "Um", "leitbegriff_wiederholung": "Wh",
+               "angstappell": "An", "suendenbock": "Sb"}
 MAX_LEITBEGRIFFE = 8
 MAX_OHNE_STIMME = 5
 
@@ -402,12 +403,115 @@ def wiederkehrende_leitbegriffe(alle: dict[str, list[dict]], quellen: dict[str, 
     return zeilen
 
 
+def erwartung_abweichungen(a: dict, e: dict) -> list[str]:
+    """Abweichungen einer Analyse von den Erwartungen eines Eintrags aus erwartung.json (leer = erfüllt)."""
+    f = []
+    if "gattung" in e and a["gattung"]["art"] not in e["gattung"]:
+        f.append(f"Gattung {a['gattung']['art']}")
+    if "kennzeichnungsproblem" in e and a["kennzeichnungsproblem"]["vorhanden"] != e["kennzeichnungsproblem"]:
+        f.append("Kennzeichnungsproblem " + ("ja" if a["kennzeichnungsproblem"]["vorhanden"] else "nein"))
+    if "richtung" in e and a["richtung"]["einordnung"] not in e["richtung"]:
+        f.append(f"Richtung {a['richtung']['einordnung']}")
+    zitate = [m["zitat"] for m in a["markierungen"] if not m["strittig"]]
+    for stelle in e.get("markiert_enthaelt", []):
+        if not any(_passen(stelle, z) for z in zitate):
+            f.append(f"nicht markiert: {stelle}")
+    for wort in e.get("nicht_markiert", []):
+        if any(normalisieren(wort) in normalisieren(z) for z in zitate):
+            f.append(f"markiert: {wort}")
+    if "strategische_muster" not in a:
+        return f + ["Analyse ohne Muster (ältere Version)"]
+    sm = a["strategische_muster"]
+    arten = {m["art"] for m in sm["muster"]}
+    for art in e.get("muster_mind", []):
+        if art not in arten:
+            f.append(f"Muster {MUSTER_KURZ[art]} fehlt")
+    if e.get("muster_keine"):
+        f += [f"Muster {MUSTER_KURZ[m['art']]} gefunden" for m in sm["muster"] if not m["strittig"]]
+    leit = {normalisieren(x) for x in sm["leitbegriffe"]}
+    f += [f"Leitbegriff {x}" for x in e.get("leitbegriffe_nicht", []) if normalisieren(x) in leit]
+    return f
+
+
+def erwartung_abgleich(alle: dict[str, list[dict]], erwartung: dict) -> list[str]:
+    namen = [n for n in alle if n in erwartung]
+    if not namen:
+        return []
+    zeilen = ["", "## Abgleich mit erwartung.json", "",
+              "Zahl in Klammern = in wie vielen Läufen die Abweichung auftrat.", "",
+              "| Artikel | Läufe erfüllt | Abweichungen |", "|---|---|---|"]
+    for name in namen:
+        laeufe = alle[name]
+        zaehler: dict[str, int] = {}
+        erfuellt = 0
+        for lauf in laeufe:
+            abw = erwartung_abweichungen(lauf["analyse"], erwartung[name])
+            erfuellt += not abw
+            for x in dict.fromkeys(abw):
+                zaehler[x] = zaehler.get(x, 0) + 1
+        text = "; ".join(f"{x} ({n}/{len(laeufe)})" for x, n in zaehler.items()) or "–"
+        zeilen.append(f"| {name} | {erfuellt}/{len(laeufe)} | {text} |")
+    return zeilen
+
+
+def _zahl(x: float) -> str:
+    return str(int(x)) if x == int(x) else f"{x:.1f}"
+
+
+def _muster_mehrheit(laeufe: list[dict]) -> set[str]:
+    """Musterarten, die in mindestens der Hälfte der Läufe vorkommen."""
+    zaehler: dict[str, int] = {}
+    for lauf in laeufe:
+        for art in {m["art"] for m in muster_von(lauf["analyse"])["muster"]}:
+            zaehler[art] = zaehler.get(art, 0) + 1
+    return {art for art, n in zaehler.items() if 2 * n >= len(laeufe)}
+
+
+def spiegelpaare(alle: dict[str, list[dict]]) -> list[str]:
+    """Vergleicht Artikel <stamm>_pro mit <stamm>_kontra: Gleiche Bauart muss gleich bewertet werden.
+
+    Teilwerte gemittelt über alle Läufe; symmetrisch heißt: keine Dimension weicht um mehr als 1 ab,
+    gleiche Muster (Mehrheit der Läufe) und gleiche Einschätzung des Kennzeichnungsproblems.
+    """
+    staemme = sorted(n[:-4] for n in alle if n.endswith("_pro") and n[:-4] + "_kontra" in alle)
+    if not staemme:
+        return []
+    zeilen = ["", "## Spiegelpaare (pro / kontra)", "",
+              "Teilwerte gemittelt über alle Läufe. Symmetrisch: keine Dimension weicht um mehr als 1 ab, "
+              "gleiche Muster (in mindestens der Hälfte der Läufe), gleiches Kennzeichnungsproblem.", "",
+              "| Paar | W | E | Q | A | Ü | Muster | Kennz.-Problem | Richtung pro | Richtung kontra | symmetrisch |",
+              "|---|---|---|---|---|---|---|---|---|---|---|"]
+    for stamm in staemme:
+        p, k = alle[stamm + "_pro"], alle[stamm + "_kontra"]
+        abweichend, zellen = [], []
+        for d in DIMENSIONEN:
+            mp = sum(l["analyse"]["teilwerte"][d]["wert"] for l in p) / len(p)
+            mk = sum(l["analyse"]["teilwerte"][d]["wert"] for l in k) / len(k)
+            zellen.append(f"{_zahl(mp)} / {_zahl(mk)}")
+            if abs(mp - mk) > 1:
+                abweichend.append(KURZ[d])
+        mup, muk = _muster_mehrheit(p), _muster_mehrheit(k)
+        kurz = lambda s: ", ".join(sorted(MUSTER_KURZ[a] for a in s)) or "–"
+        muster = kurz(mup) if mup == muk else f"{kurz(mup)} / {kurz(muk)}"
+        if mup != muk:
+            abweichend.append("Muster")
+        kp = 2 * sum(l["analyse"]["kennzeichnungsproblem"]["vorhanden"] for l in p) >= len(p)
+        kk = 2 * sum(l["analyse"]["kennzeichnungsproblem"]["vorhanden"] for l in k) >= len(k)
+        kennz = ("ja" if kp else "nein") if kp == kk else f"{'ja' if kp else 'nein'} / {'ja' if kk else 'nein'}"
+        if kp != kk:
+            abweichend.append("Kennz.")
+        zeilen.append(f"| {stamm} | " + " | ".join(zellen) + f" | {muster} | {kennz} | "
+                      f"{richtung_text(p[0]['analyse']['richtung'])} | {richtung_text(k[0]['analyse']['richtung'])} | "
+                      + ("ja" if not abweichend else "nein: " + ", ".join(abweichend)) + " |")
+    return zeilen
+
+
 def bericht(dateien: list[Path], ergebnisse: Path) -> str:
     zeilen = ["# Wertungsanalyse – Übersicht", "",
               f"Stand {datetime.now():%d.%m.%Y %H:%M}. Teilwerte W/E/Q/A/Ü = Wortwahl, epistemische Rahmung, "
               "Quellen, Auswahl, Überschrift (0–4). Kennzahl = markierte/alle Sätze, Anteil erst ab "
               f"{MIN_SAETZE_FUER_ANTEIL} Sätzen. Muster: Kl moralische Klammer, De moralische Delegitimierung, "
-              "Di Dichotomie, Wir vereinnahmendes Wir, Um Umbenennung, Wh Leitbegriff-Wiederholung; "
+              "Di Dichotomie, Wir vereinnahmendes Wir, Um Umbenennung, Wh Leitbegriff-Wiederholung, An Angstappell, Sb Sündenbock; "
               "? = strittig, – = keine, ? allein = Analyse vor Einführung der Muster. "
               "Stimmen: Stimmen/zugeschriebene Aussagen, Zahl der Positionen (ohne ‚ohne Position‘), "
               "Akteure ohne Stimme; ? = Analyse vor Einführung des Verzeichnisses.", "",
@@ -458,6 +562,10 @@ def bericht(dateien: list[Path], ergebnisse: Path) -> str:
                 f" | {v['markierungen_gemeinsam']} | {v['markierungen_jaccard']} | "
                 f"{v['dimension_gleich_bei_gemeinsamen']}/{v['markierungen_gemeinsam']} | "
                 f"{v['kennzahl'][0]} → {v['kennzahl'][1]} | {richtung} | {muster} | {stimmen} |")
+    zeilen += spiegelpaare(alle_laeufe)
+    erwartung_datei = dateien[0].parent / "erwartung.json" if dateien else None
+    if erwartung_datei and erwartung_datei.exists():
+        zeilen += erwartung_abgleich(alle_laeufe, json.loads(erwartung_datei.read_text(encoding="utf-8")))
     zeilen += wiederkehrende_leitbegriffe(alle_laeufe, quellen)
     zeilen += ["", f"Geschätzte Kosten aller gespeicherten Läufe: {kosten_summe:.2f} $"]
     return "\n".join(zeilen) + "\n"

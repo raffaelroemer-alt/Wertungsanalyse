@@ -20,6 +20,7 @@ Prompt und Schema liegen im Addon-Ordner, weil Chrome nur Dateien innerhalb des 
 Skript und Addon analysieren damit garantiert gleich.
 
 `testartikel/` und `ergebnisse/` sind in `.gitignore`: Artikeltexte und Zitate gehören nicht ins Repository.
+Ausnahme ist `spiegeltests/`: selbst geschriebene, frei erfundene Texte (siehe unten).
 
 ## Kommandozeile
 
@@ -66,10 +67,11 @@ nicht vorkommt, gilt nicht als fehlend. `uebersicht.md` zeigt das kurz als `7/21
 
 ### Strategische Muster
 
-Getrennt von Teilwerten und Kennzahl prüft der Prompt sechs Bauformen gezielter Überzeugungskommunikation
+Getrennt von Teilwerten und Kennzahl prüft der Prompt acht Bauformen gezielter Überzeugungskommunikation
 (abgeleitet aus einem Framing-Leitfaden, umgekehrt als Erkennungsmerkmale): moralische Klammer (Kl),
 moralische Delegitimierung (De), Dichotomie (Di), vereinnahmendes Wir (Wir), Umbenennung (Um),
-Leitbegriff-Wiederholung (Wh). Ein Muster beschreibt den Bau des Textes, nicht eine Absicht. Dazu nennt das
+Leitbegriff-Wiederholung (Wh), dazu aus den Taxonomien der Überzeugungstechniken (SemEval-2023 Task 3,
+siehe `LITERATUR.md`) Angstappell (An) und Sündenbock (Sb). Ein Muster beschreibt den Bau des Textes, nicht eine Absicht. Dazu nennt das
 Modell bis zu acht wertende Leitbegriffe in Grundform.
 
 `uebersicht.md` zeigt die Muster je Artikel (`?` hinter dem Kürzel = strittig, `–` = keine, `?` allein = Analyse
@@ -82,6 +84,31 @@ kein Beleg: Agenturvorlagen und Begriffe aus der Debatte selbst führen zum selb
 Teilwerte: Abweichung je Dimension, Mittel und Maximum. Markierungen: zwei Fundstellen gelten als dieselbe, wenn
 eine in der anderen steckt oder sie mindestens die Hälfte der Wörter teilen; daraus Anzahl gemeinsam, Jaccard
 (gemeinsam / alle verschiedenen) und wie viele der gemeinsamen dieselbe Dimension haben.
+
+### Spiegeltests
+
+`spiegeltests/` prüft, ob die Analyse beide Seiten gleich behandelt. Die Texte zur (erfundenen) Erhöhung des
+Rundfunkbeitrags sind frei erfunden: Namen, Zahlen, Domains (`.example`).
+
+| Datei | Bauart |
+|---|---|
+| `rundfunk_bericht_pro` / `_kontra` | als Bericht aufgemacht, aber durchgehend parteiisch; alle sechs Muster, „sogenannt“, wertende Redeverben, gespiegelt Satz für Satz |
+| `rundfunk_kommentar_pro` / `_kontra` | gekennzeichneter Kommentar derselben Quelle, dieselben Leitbegriffe wie der Bericht |
+| `rundfunk_neutral` | Kontrolle: dieselben Fakten, die Kampfbegriffe beider Seiten nur in zugeschriebenen Zitaten |
+
+```powershell
+.venv\Scripts\python wertung.py --ordner spiegeltests --ergebnisse ergebnisse\spiegel
+```
+
+Fünf Artikel × zwei Läufe = zehn API-Aufrufe. `uebersicht.md` hat dann drei zusätzliche Abschnitte:
+- **Spiegelpaare:** `<stamm>_pro` gegen `<stamm>_kontra`. Die Teilwerte werden über alle Läufe gemittelt.
+  Symmetrisch heißt: keine Dimension weicht um mehr als 1 ab, gleiche Muster (in mindestens der Hälfte der
+  Läufe) und gleiches Kennzeichnungsproblem. Die Richtung muss man selbst ansehen: Sie soll gespiegelt sein.
+- **Abgleich mit `erwartung.json`:** je Artikel, in wie vielen Läufen alles erfüllt ist und was abwich
+  (Gattung, Kennzeichnungsproblem, Richtung, Muster, Stellen, die markiert oder gerade nicht markiert sein müssen,
+  verbotene Leitbegriffe). Das funktioniert für jeden Ordner, in dem eine `erwartung.json` liegt.
+- **Wiederkehrende Leitbegriffe:** `pro.example` und `kontra.example` sollten je zwei Artikel mit gemeinsamen
+  Begriffen zeigen. `neutral.example` sollte dort nicht auftauchen.
 
 ## Addon
 
