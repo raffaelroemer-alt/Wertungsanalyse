@@ -33,12 +33,23 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["zitat", "dimension", "begruendung", "alternative", "strittig", "ausserhalb_zaehlbasis", "nur_struktur"],
+        "required": ["zitat", "dimension", "begruendung", "alternative", "wirkung", "wortleiter", "strittig", "ausserhalb_zaehlbasis", "nur_struktur"],
         "properties": {
           "zitat": {"type": "string", "description": "zeichengenau aus dem Artikel, höchstens zehn Wörter"},
           "dimension": {"type": "string", "enum": ["wortwahl", "epistemisch", "quellen", "auswahl", "ueberschrift"]},
           "begruendung": {"type": "string"},
           "alternative": {"type": "string"},
+          "wirkung": {"type": "string", "description": "möglicher Eindruck beim Leser, als Einschätzung formuliert"},
+          "wortleiter": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["stufen", "gewaehlt", "neutral"],
+            "properties": {
+              "stufen": {"type": "array", "items": {"type": "string"}, "description": "3–7 Ausdrücke von abwertend zu aufwertend, sonst leer"},
+              "gewaehlt": {"type": "integer", "description": "Stelle des Ausdrucks aus dem Artikel, ab 0"},
+              "neutral": {"type": "integer", "description": "Stelle des neutralsten Ausdrucks, ab 0"}
+            }
+          },
           "strittig": {"type": "boolean"},
           "ausserhalb_zaehlbasis": {"type": "boolean"},
           "nur_struktur": {"type": "boolean"}

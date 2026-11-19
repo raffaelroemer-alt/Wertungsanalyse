@@ -112,6 +112,16 @@ def pruefen(analyse: dict, artikeltext: str) -> dict:
                 muster_nicht_gefunden.append(b)
             if len(b.split()) > 10:
                 muster_zu_lang.append(b)
+    leiter_ungueltig, leiter_gleich = [], []
+    for m in analyse["markierungen"]:
+        wl = m.get("wortleiter") or {"stufen": []}
+        n = len(wl["stufen"])
+        if not n:
+            continue
+        if not 3 <= n <= 7 or not (0 <= wl["gewaehlt"] < n and 0 <= wl["neutral"] < n):
+            leiter_ungueltig.append(m["zitat"])
+        elif wl["gewaehlt"] == wl["neutral"] and not m["strittig"]:
+            leiter_gleich.append(m["zitat"])
     st = stimmen_von(analyse)
     stimmen_nicht_gefunden, stimmen_zu_lang = [], []
     for sm_ in st["liste"]:
@@ -133,6 +143,11 @@ def pruefen(analyse: dict, artikeltext: str) -> dict:
         "muster_belege_zu_lang": muster_zu_lang,
         "muster_ohne_beleg": [mu["art"] for mu in sm["muster"] if not mu["belege"]],
         "leitbegriffe_zu_viele": len(sm["leitbegriffe"]) > MAX_LEITBEGRIFFE,
+        "wirkung_fehlt": [m["zitat"] for m in analyse["markierungen"] if "wirkung" in m and not m["wirkung"].strip()],
+        "wortleiter_ungueltig": leiter_ungueltig,
+        "wortleiter_gewaehlt_ist_neutral": leiter_gleich,
+        "wortleiter_anteil": (f"{sum(bool((m.get('wortleiter') or {}).get('stufen')) for m in analyse['markierungen'])}"
+                              f"/{len(analyse['markierungen'])}"),
         "stimmen_vorkommen_nicht_gefunden": stimmen_nicht_gefunden,
         "stimmen_vorkommen_zu_lang": stimmen_zu_lang,
         "stimmen_ohne_aussage": [x["sprecher"] for x in st["liste"] if x["aussagen"] < 1],

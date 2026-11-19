@@ -54,6 +54,18 @@ Richtungsbelege ohne Markierung, Teilwerte ohne Markierung und umgekehrt. Für d
 Belege, die nicht im Artikel stehen oder über zehn Wörter haben, Muster ohne Beleg, mehr als acht Leitbegriffe.
 Für das Stimmenverzeichnis: erstes Vorkommen nicht im Artikel oder über zehn Wörter, Stimmen ohne Aussage,
 mehr zugeschriebene Aussagen als Sätze, mehr als fünf Akteure ohne Stimme.
+Für Wirkung und Wortleiter: leere Wirkung, Wortleitern mit weniger als drei oder mehr als sieben Stufen oder
+Stellen außerhalb der Reihe, nicht strittige Markierungen, bei denen das gewählte Wort zugleich das neutrale ist,
+und der Anteil der Markierungen mit Wortleiter.
+
+### Wirkung und Wortleiter
+
+Jede Markierung trägt zwei Felder, die Claudes Wissen über die Wirkung von Sprache sichtbar machen, ohne in Teilwerte
+oder Kennzahl einzugehen. `wirkung` sagt in einem Satz, welchen Eindruck die Stelle beim Lesen erzeugen kann (als
+Einschätzung, nicht als Aussage über Absicht oder gemessene Leserreaktion). `wortleiter` ordnet bei einzelnen Wörtern
+und Wendungen drei bis sieben gleichbedeutende Ausdrücke von abwertend bis aufwertend
+(„poltert – behauptet – sagt – erklärt – stellt klar“) und nennt die Stelle des gewählten und des neutralsten Ausdrucks.
+Bei Struktur- und Überschriftbefunden bleibt die Leiter leer.
 
 ### Wer kommt zu Wort
 
@@ -130,8 +142,9 @@ Nach Änderungen am Code auf `chrome://extensions` beim Addon auf ↻ klicken un
 - Klick aufs Symbol startet die Analyse des aktiven Tabs (nie automatisch). Ein zweiter Klick blendet die
   Leiste aus und ein. Gemerkte Ergebnisse kommen ohne API-Aufruf; ↻ in der Leiste analysiert neu (kostet).
 - Farben: Wortwahl orange, epistemische Rahmung violett, Quellen blau, Auswahl grün, Überschrift rot.
-  Gestrichelt = strittig, gepunktet = nur struktureller Befund. Überfahren zeigt Begründung und neutrale Alternative,
-  ein Klick auf eine Fundstelle in der Leiste springt hin.
+  Gestrichelt = strittig, gepunktet = nur struktureller Befund. Überfahren zeigt Begründung, Wirkung (gelb),
+  die Wortleiter (− abwertend bis + aufwertend, gewähltes Wort weiß gefüllt, neutrales grün umrandet) und die neutrale
+  Alternative; ein Klick auf eine Fundstelle in der Leiste springt hin.
 - Der Abschnitt „Strategische Muster“ nennt die Muster mit Begründung und Belegen. Ein Klick auf einen Beleg springt
   hin und hebt ihn kurz gelb hervor (die Belege werden nicht dauerhaft markiert). Gemerkte Ergebnisse aus der Zeit
   vor den Mustern zeigen dort einen Hinweis; ↻ analysiert neu.

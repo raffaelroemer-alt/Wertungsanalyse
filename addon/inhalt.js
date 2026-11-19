@@ -299,6 +299,12 @@
     .tip .befund + .befund { border-top: 1px solid #444; margin-top: 6px; padding-top: 6px; }
     .tip .dim { font-weight: 600; }
     .tip .alt { color: #b9f6ca; margin-top: 3px; }
+    .tip .wirk { color: #ffe0a3; margin-top: 3px; }
+    .tip .leiter { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; margin-top: 5px; }
+    .tip .pol { color: #999; font-weight: 600; padding: 0 2px; }
+    .tip .stufe { border: 1px solid #555; border-radius: 4px; padding: 0 5px; color: #ccc; font-size: 12px; }
+    .tip .stufe.neutral { border-color: #b9f6ca; color: #b9f6ca; }
+    .tip .stufe.gewaehlt { background: #fff; color: #1f1f1f; border-color: #fff; font-weight: 600; }
     .fuss { font-size: 11.5px; color: #777; padding-top: 10px; }
     .muster { margin: 6px 0 10px; }
     .pos { margin: 4px 0; }
@@ -578,6 +584,19 @@
 
   // ------------------------------------------------------------ Hinweis beim Überfahren
 
+  // Wortleiter: Stufen von abwertend (links) bis aufwertend (rechts), gewähltes Wort gefüllt, neutrales umrandet
+  function wortleiter(wl) {
+    const n = wl && Array.isArray(wl.stufen) ? wl.stufen.length : 0;
+    if (n < 2 || !(wl.gewaehlt >= 0 && wl.gewaehlt < n)) return null;
+    return el("div", { class: "leiter" },
+      el("span", { class: "pol" }, "−"),
+      wl.stufen.map((s, i) => el("span", {
+        class: "stufe" + (i === wl.gewaehlt ? " gewaehlt" : "") + (i === wl.neutral ? " neutral" : ""),
+        title: i === wl.gewaehlt ? "im Artikel" : i === wl.neutral ? "neutral" : "",
+      }, s)),
+      el("span", { class: "pol" }, "+"));
+  }
+
   document.addEventListener("mouseover", (e) => {
     const mark = e.target instanceof Element ? e.target.closest("wa-mark") : null;
     const tip = $("tip");
@@ -591,6 +610,8 @@
         el("div", { class: "dim", style: `color:${d.farbe}; filter: brightness(1.6)` },
           d.name + (m.strittig ? " · strittig" : "") + (m.nur_struktur ? " · strukturell" : "")),
         el("div", {}, m.begruendung),
+        m.wirkung && el("div", { class: "wirk" }, "Wirkung: " + m.wirkung),
+        wortleiter(m.wortleiter),
         el("div", { class: "alt" }, "Neutral: " + m.alternative));
     }));
     tip.hidden = false;
