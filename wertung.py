@@ -209,8 +209,18 @@ def kennzahl_text(k: dict) -> str:
 # ---------------------------------------------------------------- API-Aufruf
 
 def analysieren(client, artikeltext: str, modell: str, effort: str, fallback: bool) -> tuple[dict, dict]:
-    system = (KERN / "prompt.md").read_text(encoding="utf-8")
-    schema = json.loads((KERN / "schema.json").read_text(encoding="utf-8"))
+    return _anfrage(client, "prompt.md", "schema.json", artikeltext, modell, effort, fallback)
+
+
+def spiegeln(client, artikeltext: str, modell: str, effort: str, fallback: bool) -> tuple[dict, dict]:
+    """Gegenfassung mit vertauschten Seiten (Spiegelprobe), gleiche Machart und Stärke wie das Original."""
+    return _anfrage(client, "spiegel_prompt.md", "spiegel_schema.json", artikeltext, modell, effort, fallback)
+
+
+def _anfrage(client, prompt_datei: str, schema_datei: str, artikeltext: str, modell: str, effort: str,
+             fallback: bool) -> tuple[dict, dict]:
+    system = (KERN / prompt_datei).read_text(encoding="utf-8")
+    schema = json.loads((KERN / schema_datei).read_text(encoding="utf-8"))
     anfrage = dict(
         model=modell,
         max_tokens=MAX_TOKENS,
@@ -227,7 +237,7 @@ def analysieren(client, artikeltext: str, modell: str, effort: str, fallback: bo
     dauer = time.monotonic() - beginn
 
     if antwort.stop_reason == "refusal":
-        raise RuntimeError("Das Modell hat die Analyse abgelehnt (stop_reason: refusal).")
+        raise RuntimeError("Das Modell hat die Anfrage abgelehnt (stop_reason: refusal).")
     if antwort.stop_reason == "max_tokens":
         raise RuntimeError(f"Antwort abgeschnitten (max_tokens={MAX_TOKENS} erreicht).")
     text = next(b.text for b in antwort.content if b.type == "text")
@@ -482,6 +492,32 @@ def _muster_mehrheit(laeufe: list[dict]) -> set[str]:
     return {art for art, n in zaehler.items() if 2 * n >= len(laeufe)}
 
 
+def symmetrie(a: list[dict], b: list[dict]) -> dict:
+    """Vergleicht zwei Gruppen von Läufen (pro/kontra oder Original/Gegenfassung).
+
+    Teilwerte gemittelt; abweichend ist eine Dimension mit mehr als 1 Unterschied, ungleiche Muster
+    (Mehrheit der Läufe) und ungleiches Kennzeichnungsproblem.
+    """
+    zellen, abweichend = [], []
+    for d in DIMENSIONEN:
+        ma = sum(l["analyse"]["teilwerte"][d]["wert"] for l in a) / len(a)
+        mb = sum(l["analyse"]["teilwerte"][d]["wert"] for l in b) / len(b)
+        zellen.append(f"{_zahl(ma)} / {_zahl(mb)}")
+        if abs(ma - mb) > 1:
+            abweichend.append(KURZ[d])
+    mua, mub = _muster_mehrheit(a), _muster_mehrheit(b)
+    kurz = lambda menge: ", ".join(sorted(MUSTER_KURZ[x] for x in menge)) or "–"
+    muster = kurz(mua) if mua == mub else f"{kurz(mua)} / {kurz(mub)}"
+    if mua != mub:
+        abweichend.append("Muster")
+    ka = 2 * sum(l["analyse"]["kennzeichnungsproblem"]["vorhanden"] for l in a) >= len(a)
+    kb = 2 * sum(l["analyse"]["kennzeichnungsproblem"]["vorhanden"] for l in b) >= len(b)
+    kennz = ("ja" if ka else "nein") if ka == kb else f"{'ja' if ka else 'nein'} / {'ja' if kb else 'nein'}"
+    if ka != kb:
+        abweichend.append("Kennz.")
+    return {"zellen": zellen, "muster": muster, "kennz": kennz, "abweichend": abweichend}
+
+
 def spiegelpaare(alle: dict[str, list[dict]]) -> list[str]:
     """Vergleicht Artikel <stamm>_pro mit <stamm>_kontra: Gleiche Bauart muss gleich bewertet werden.
 
@@ -498,27 +534,62 @@ def spiegelpaare(alle: dict[str, list[dict]]) -> list[str]:
               "|---|---|---|---|---|---|---|---|---|---|---|"]
     for stamm in staemme:
         p, k = alle[stamm + "_pro"], alle[stamm + "_kontra"]
-        abweichend, zellen = [], []
-        for d in DIMENSIONEN:
-            mp = sum(l["analyse"]["teilwerte"][d]["wert"] for l in p) / len(p)
-            mk = sum(l["analyse"]["teilwerte"][d]["wert"] for l in k) / len(k)
-            zellen.append(f"{_zahl(mp)} / {_zahl(mk)}")
-            if abs(mp - mk) > 1:
-                abweichend.append(KURZ[d])
-        mup, muk = _muster_mehrheit(p), _muster_mehrheit(k)
-        kurz = lambda s: ", ".join(sorted(MUSTER_KURZ[a] for a in s)) or "–"
-        muster = kurz(mup) if mup == muk else f"{kurz(mup)} / {kurz(muk)}"
-        if mup != muk:
-            abweichend.append("Muster")
-        kp = 2 * sum(l["analyse"]["kennzeichnungsproblem"]["vorhanden"] for l in p) >= len(p)
-        kk = 2 * sum(l["analyse"]["kennzeichnungsproblem"]["vorhanden"] for l in k) >= len(k)
-        kennz = ("ja" if kp else "nein") if kp == kk else f"{'ja' if kp else 'nein'} / {'ja' if kk else 'nein'}"
-        if kp != kk:
-            abweichend.append("Kennz.")
-        zeilen.append(f"| {stamm} | " + " | ".join(zellen) + f" | {muster} | {kennz} | "
+        sym = symmetrie(p, k)
+        abweichend = sym["abweichend"]
+        zeilen.append(f"| {stamm} | " + " | ".join(sym["zellen"]) + f" | {sym['muster']} | {sym['kennz']} | "
                       f"{richtung_text(p[0]['analyse']['richtung'])} | {richtung_text(k[0]['analyse']['richtung'])} | "
                       + ("ja" if not abweichend else "nein: " + ", ".join(abweichend)) + " |")
     return zeilen
+
+
+def spiegel_pfad(ergebnisse: Path, datei: Path, name: str) -> Path:
+    """Dateien der Spiegelprobe: spiegel.json (Gegenfassung), spiegel_text.txt, spiegel_lauf1.json (ihre Analyse)."""
+    return ergebnisse / datei.stem / name
+
+
+def _richtung_gedreht(o: dict, s: dict) -> bool:
+    """Bei Parteinahme in beiden Fassungen: Wer im Original begünstigt wird, darf es im Spiegel nicht sein."""
+    if o["einordnung"] != "parteinahme" or s["einordnung"] != "parteinahme":
+        return True
+    return not any(_passen(x, y) for x in o["zugunsten"] for y in s["zugunsten"])
+
+
+def spiegelprobe(dateien: list[Path], ergebnisse: Path, alle: dict[str, list[dict]]) -> list[str]:
+    zeilen = []
+    for datei in dateien:
+        sp = spiegel_pfad(ergebnisse, datei, "spiegel.json")
+        if not sp.exists():
+            continue
+        g = json.loads(sp.read_text(encoding="utf-8"))["spiegel"]
+        an = spiegel_pfad(ergebnisse, datei, "spiegel_lauf1.json")
+        if not g["spiegelbar"]:
+            zeilen.append(f"| {datei.stem} | nicht spiegelbar: {g['streitfrage']} |" + " |" * 10)
+            continue
+        if not an.exists() or datei.stem not in alle:
+            zeilen.append(f"| {datei.stem} | Analyse fehlt |" + " |" * 10)
+            continue
+        s = json.loads(an.read_text(encoding="utf-8"))
+        sym = symmetrie(alle[datei.stem], [s])
+        abweichend = sym["abweichend"]
+        ro, rs = alle[datei.stem][0]["analyse"]["richtung"], s["analyse"]["richtung"]
+        if ro["einordnung"] != rs["einordnung"]:
+            abweichend.append("Richtung")
+        elif not _richtung_gedreht(ro, rs):
+            abweichend.append("Richtung nicht gedreht")
+        zeilen.append(f"| {datei.stem} | " + " | ".join(sym["zellen"]) + f" | {sym['muster']} | {sym['kennz']} | "
+                      f"{richtung_text(ro)} | {richtung_text(rs)} | {len(g['nicht_gespiegelt'])} | "
+                      + ("ja" if not abweichend else "nein: " + ", ".join(abweichend)) + " |")
+    if not zeilen:
+        return []
+    return ["", "## Spiegelprobe (Original / Gegenfassung)", "",
+            "Die Gegenfassung vertauscht die Seiten bei gleicher Machart (spiegel_text.txt je Artikel). Teilwerte: "
+            "Mittel der Original-Läufe / ein Lauf der Gegenfassung. Symmetrisch: keine Dimension weicht um mehr als 1 "
+            "ab, gleiche Muster, gleiches Kennzeichnungsproblem, gleiche Einordnung der Richtung, bei Parteinahme "
+            "gedreht. Eine Abweichung heißt: Die Analyse misst ungleich oder die Gegenfassung ist nicht gleich stark "
+            "geraten; das zeigt nur das Lesen der Gegenfassung.", "",
+            "| Artikel | W | E | Q | A | Ü | Muster | Kennz.-Problem | Richtung Original | Richtung Gegenfassung "
+            "| nicht gespiegelt | symmetrisch |",
+            "|---|---|---|---|---|---|---|---|---|---|---|---|"] + zeilen
 
 
 def bericht(dateien: list[Path], ergebnisse: Path) -> str:
@@ -578,6 +649,7 @@ def bericht(dateien: list[Path], ergebnisse: Path) -> str:
                 f"{v['dimension_gleich_bei_gemeinsamen']}/{v['markierungen_gemeinsam']} | "
                 f"{v['kennzahl'][0]} → {v['kennzahl'][1]} | {richtung} | {muster} | {stimmen} |")
     zeilen += spiegelpaare(alle_laeufe)
+    zeilen += spiegelprobe(dateien, ergebnisse, alle_laeufe)
     erwartung_datei = dateien[0].parent / "erwartung.json" if dateien else None
     if erwartung_datei and erwartung_datei.exists():
         zeilen += erwartung_abgleich(alle_laeufe, json.loads(erwartung_datei.read_text(encoding="utf-8")))
@@ -601,6 +673,8 @@ def main() -> int:
     ap.add_argument("--ohne-fallback", action="store_true", help="kein Ersatzmodell bei Ablehnung")
     ap.add_argument("--parallel", type=int, default=4)
     ap.add_argument("--vergleichen", action="store_true", help="nur auswerten, keine API-Aufrufe")
+    ap.add_argument("--spiegel", action="store_true",
+                    help="Spiegelprobe: Gegenfassung schreiben und analysieren (zwei Aufrufe je Artikel)")
     args = ap.parse_args()
 
     ordner, ergebnisse = Path(args.ordner), Path(args.ergebnisse)
@@ -616,6 +690,9 @@ def main() -> int:
     if not args.vergleichen:
         auftraege = [(d, nr) for d in dateien for nr in range(1, args.laeufe + 1)
                      if args.neu or not lauf_pfad(ergebnisse, d, nr).exists()]
+        if args.spiegel:
+            auftraege += [(d, 0) for d in dateien
+                          if args.neu or not spiegel_pfad(ergebnisse, d, "spiegel_lauf1.json").exists()]
         if auftraege:
             if not os.environ.get("ANTHROPIC_API_KEY"):
                 print("ANTHROPIC_API_KEY ist nicht gesetzt. In PowerShell: $env:ANTHROPIC_API_KEY = Read-Host -MaskInput",
@@ -623,9 +700,31 @@ def main() -> int:
                 return 2
             import anthropic
             client = anthropic.Anthropic()
-            print(f"{len(auftraege)} Analysen mit {args.modell}, effort {args.effort} …")
+            print(f"{len(auftraege)} Aufträge mit {args.modell}, effort {args.effort} …")
+
+            def spiegel_erledigen(datei: Path) -> str:
+                """Lauf 0 = Spiegelprobe: Gegenfassung (falls nötig) und ihre Analyse."""
+                text = datei.read_text(encoding="utf-8-sig")
+                sp = spiegel_pfad(ergebnisse, datei, "spiegel.json")
+                if args.neu or not sp.exists():
+                    gegen, meta = spiegeln(client, text, args.modell, args.effort, not args.ohne_fallback)
+                    sp.parent.mkdir(parents=True, exist_ok=True)
+                    sp.write_text(json.dumps({"artikel": datei.name, "meta": meta, "spiegel": gegen},
+                                             ensure_ascii=False, indent=2), encoding="utf-8")
+                    spiegel_pfad(ergebnisse, datei, "spiegel_text.txt").write_text(gegen["text"], encoding="utf-8")
+                gegen = json.loads(sp.read_text(encoding="utf-8"))["spiegel"]
+                if not gegen["spiegelbar"] or not gegen["text"].strip():
+                    return f"{datei.stem} Spiegelprobe: nicht spiegelbar ({gegen['streitfrage']})"
+                analyse, meta = analysieren(client, gegen["text"], args.modell, args.effort, not args.ohne_fallback)
+                spiegel_pfad(ergebnisse, datei, "spiegel_lauf1.json").write_text(
+                    json.dumps({"artikel": datei.name, "lauf": "spiegel", "meta": meta, "analyse": analyse,
+                                "pruefung": pruefen(analyse, gegen["text"])}, ensure_ascii=False, indent=2),
+                    encoding="utf-8")
+                return f"{datei.stem} Spiegelprobe: {len(gegen['nicht_gespiegelt'])} Stellen nicht gespiegelt"
 
             def erledigen(datei: Path, nr: int) -> str:
+                if nr == 0:
+                    return spiegel_erledigen(datei)
                 text = datei.read_text(encoding="utf-8-sig")
                 analyse, meta = analysieren(client, text, args.modell, args.effort, not args.ohne_fallback)
                 ziel = lauf_pfad(ergebnisse, datei, nr)
@@ -640,6 +739,7 @@ def main() -> int:
                 zukunft = {pool.submit(erledigen, d, nr): (d, nr) for d, nr in auftraege}
                 for z in as_completed(zukunft):
                     d, nr = zukunft[z]
+                    nr = nr or "Spiegelprobe"
                     try:
                         print("  " + z.result())
                     except anthropic.AuthenticationError:

@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["spiegelbar", "streitfrage", "seite_a", "seite_b", "original_beguenstigt", "tausch", "nicht_gespiegelt", "text"],
+  "properties": {
+    "spiegelbar": {"type": "boolean"},
+    "streitfrage": {"type": "string"},
+    "seite_a": {"type": "string"},
+    "seite_b": {"type": "string"},
+    "original_beguenstigt": {"type": "string", "enum": ["seite_a", "seite_b", "keine"]},
+    "tausch": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["original", "spiegel"],
+        "properties": {
+          "original": {"type": "string", "description": "wörtlich aus dem Artikel, höchstens zehn Wörter"},
+          "spiegel": {"type": "string"}
+        }
+      }
+    },
+    "nicht_gespiegelt": {"type": "array", "items": {"type": "string"}},
+    "text": {"type": "string", "description": "vollständige Gegenfassung, erste Zeile Überschrift, Marken wie im Original"}
+  }
+}

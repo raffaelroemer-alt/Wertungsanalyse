@@ -14,7 +14,9 @@ async function anzeigen() {
   $("modell").value = alles.modell || VORGABEN.modell;
   $("effort").value = alles.effort || VORGABEN.effort;
   const ergebnisse = Object.keys(alles).filter((k) => k.startsWith("ergebnis:"));
-  $("speicherStand").textContent = ergebnisse.length === 1 ? "1 Ergebnis gespeichert." : `${ergebnisse.length} Ergebnisse gespeichert.`;
+  const spiegel = Object.keys(alles).filter((k) => k.startsWith("spiegel:")).length;
+  $("speicherStand").textContent = (ergebnisse.length === 1 ? "1 Ergebnis gespeichert" : `${ergebnisse.length} Ergebnisse gespeichert`)
+    + (spiegel ? `, dazu ${spiegel} Spiegelprobe${spiegel === 1 ? "" : "n"}.` : ".");
 }
 
 $("schluesselSpeichern").addEventListener("click", async () => {
@@ -42,7 +44,7 @@ $("modellSpeichern").addEventListener("click", async () => {
 
 $("speicherLeeren").addEventListener("click", async () => {
   const alles = await chrome.storage.local.get(null);
-  await chrome.storage.local.remove(Object.keys(alles).filter((k) => k.startsWith("ergebnis:")));
+  await chrome.storage.local.remove(Object.keys(alles).filter((k) => k.startsWith("ergebnis:") || k.startsWith("spiegel:")));
   anzeigen();
 });
 

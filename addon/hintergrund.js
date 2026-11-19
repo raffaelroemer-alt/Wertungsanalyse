@@ -55,18 +55,26 @@ chrome.runtime.onConnect.addListener((port) => {
   const abbruch = new AbortController();
   port.onDisconnect.addListener(() => abbruch.abort());
   port.onMessage.addListener(async (nachricht) => {
-    if (nachricht.art !== "start") return;
+    if (nachricht.art !== "start" && nachricht.art !== "spiegel") return;
     const senden = (inhalt) => { try { port.postMessage(inhalt); } catch { /* Tab geschlossen */ } };
     try {
       const schluessel = speicherSchluessel(nachricht.url);
+      const spiegelSchluessel = schluessel.replace(/^ergebnis:/, "spiegel:");
+      if (nachricht.art === "spiegel") {
+        const spiegel = await spiegelprobe(nachricht.text, senden, abbruch.signal);
+        await chrome.storage.local.set({ [spiegelSchluessel]: spiegel });
+        senden({ art: "spiegel_fertig", spiegel });
+        return;
+      }
+      const gemerkterSpiegel = (await chrome.storage.local.get(spiegelSchluessel))[spiegelSchluessel] || null;
       if (!nachricht.neu) {
         const gemerkt = (await chrome.storage.local.get(schluessel))[schluessel];
-        if (gemerkt) { senden({ art: "fertig", ergebnis: gemerkt, ausSpeicher: true }); return; }
+        if (gemerkt) { senden({ art: "fertig", ergebnis: gemerkt, spiegel: gemerkterSpiegel, ausSpeicher: true }); return; }
       }
       const ergebnis = await analysieren(nachricht.text, (stand) => senden({ art: "stand", ...stand }), abbruch.signal);
       ergebnis.url = nachricht.url;
       await chrome.storage.local.set({ [schluessel]: ergebnis });
-      senden({ art: "fertig", ergebnis, ausSpeicher: false });
+      senden({ art: "fertig", ergebnis, spiegel: gemerkterSpiegel, ausSpeicher: false });
     } catch (e) {
       if (abbruch.signal.aborted) return;
       senden({ art: "fehler", code: e.code || "unbekannt", text: e.message });
@@ -85,13 +93,32 @@ function speicherSchluessel(url) {
 }
 
 async function analysieren(text, melden, signal) {
+  const { daten, meta } = await apiAufruf("analyse/prompt.md", "analyse/schema.json", text, melden, signal);
+  return { analyse: daten, meta };
+}
+
+// Spiegelprobe: Gegenfassung mit vertauschten Seiten schreiben, dann mit demselben Prompt analysieren.
+async function spiegelprobe(text, senden, signal) {
+  const schritt = (name) => (stand) => senden({ art: "stand", schritt: name, ...stand });
+  const gegen = await apiAufruf("analyse/spiegel_prompt.md", "analyse/spiegel_schema.json", text,
+    schritt("Gegenfassung schreiben (1/2)"), signal);
+  const spiegel = { gegenfassung: gegen.daten, meta_gegenfassung: gegen.meta, analyse: null, meta: null };
+  if (gegen.daten.spiegelbar && gegen.daten.text.trim()) {
+    const a = await analysieren(gegen.daten.text, schritt("Gegenfassung analysieren (2/2)"), signal);
+    spiegel.analyse = a.analyse;
+    spiegel.meta = a.meta;
+  }
+  return spiegel;
+}
+
+async function apiAufruf(promptDatei, schemaDatei, text, melden, signal) {
   const einst = { ...VORGABEN, ...(await chrome.storage.local.get(["apiKey", "modell", "effort"])) };
   if (!einst.apiKey) throw new Fehler("schluessel", "Kein API-Schlüssel gespeichert. Bitte auf der Einstellungsseite eintragen.");
   if (text.length > MAX_ZEICHEN) throw new Fehler("zu_lang", `Der Artikel ist zu lang (${text.length} Zeichen, höchstens ${MAX_ZEICHEN}).`);
 
   const [prompt, schema] = await Promise.all([
-    fetch(chrome.runtime.getURL("analyse/prompt.md")).then((r) => r.text()),
-    fetch(chrome.runtime.getURL("analyse/schema.json")).then((r) => r.json()),
+    fetch(chrome.runtime.getURL(promptDatei)).then((r) => r.text()),
+    fetch(chrome.runtime.getURL(schemaDatei)).then((r) => r.json()),
   ]);
   const anfrage = {
     model: einst.modell,
@@ -127,8 +154,7 @@ async function analysieren(text, melden, signal) {
     }
     if (!antwort.ok) throw await apiFehler(antwort, einst.modell);
     const ergebnis = await stromLesen(antwort, melden, beginn);
-    const analyse = auswerten(ergebnis);
-    return { analyse, meta: metaDaten(ergebnis, einst, beginn) };
+    return { daten: auswerten(ergebnis), meta: metaDaten(ergebnis, einst, beginn) };
   } finally {
     clearInterval(wach);
   }

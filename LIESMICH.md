@@ -9,6 +9,7 @@ Richtung, Kennzahl, neutrale Fassung) mit der Anthropic-API. Nicht zur Veröffen
 |---|---|
 | `addon/analyse/prompt.md` | fester Analyse-Prompt (Kriterien aus dem Skill „artikel-wertungsanalyse“ plus Anker 0–4, Kurztexte ohne Anteil, ein Befund = eine Dimension) |
 | `addon/analyse/schema.json` | JSON-Schema der Antwort (strukturierte Ausgabe über `output_config.format`) |
+| `addon/analyse/spiegel_prompt.md` · `spiegel_schema.json` | Spiegelprobe: Gegenfassung mit vertauschten Seiten, gleicher Machart und Stärke, ohne neue Fakten oder Zitate |
 | `wertung.py` | Kommandozeile: analysiert `testartikel/`, speichert `ergebnisse/<artikel>/laufN.json`, vergleicht zwei Läufe, schreibt `ergebnisse/uebersicht.md` |
 | `addon/manifest.json` | Chrome-Addon, Manifest V3, Rechte: `activeTab`, `scripting`, `storage`, Zugriff nur auf `api.anthropic.com` |
 | `addon/hintergrund.js` | Service Worker: Klick aufs Symbol → Skripte in den Tab; API-Aufruf (Streaming, strukturierte Ausgabe); Zwischenspeicher je Adresse |
@@ -34,6 +35,7 @@ $env:ANTHROPIC_API_KEY = Read-Host -MaskInput "API-Schlüssel"
 - Je Artikel zwei Läufe (`--laeufe N`). Vorhandene Läufe werden nicht neu bezahlt, `--neu` überschreibt.
 - `--modell` (Vorgabe `claude-opus-5-5`, auch `WERTUNG_MODELL`), `--effort low|medium|high|xhigh|max` (Vorgabe `high`).
 - `--vergleichen` wertet nur die gespeicherten Läufe aus, ohne API-Aufruf.
+- `--spiegel` macht zusätzlich die Spiegelprobe (siehe unten): je Artikel zwei weitere Aufrufe, einmalig.
 - Bei Opus 5.5/Sonnet 5.5 springt bei einer Ablehnung serverseitig ein Ersatzmodell ein (`fallbacks: "default"`,
   Beta); `--ohne-fallback` schaltet das ab.
 
@@ -124,6 +126,29 @@ analysiert nur das neue Paar). `uebersicht.md` hat dann drei zusätzliche Abschn
 - **Wiederkehrende Leitbegriffe:** `pro.example` und `kontra.example` sollten je zwei Artikel mit gemeinsamen
   Begriffen zeigen. `neutral.example` sollte dort nicht auftauchen.
 
+### Spiegelprobe
+
+Macht aus jedem echten Artikel einen Spiegeltest. Ein eigener Prompt schreibt eine **Gegenfassung**: derselbe Text,
+als hätte ihn die andere Seite der Streitfrage geschrieben, mit derselben Machart und Stärke. Wertende Wörter,
+Redeverben, Reihenfolge und Raum der Stimmen, Zuspitzung und Muster wechseln die Seite. Fakten, Zahlen, Namen, wer was
+vertritt und wörtliche Zitate bleiben; was sich nur mit erfundenen Fakten oder Zitaten spiegeln ließe, bleibt
+sachlich stehen und wird als „nicht gespiegelt“ genannt. Texte ohne zwei Seiten (Unfall, Wetter) sind nicht spiegelbar.
+
+Die Gegenfassung wird mit dem normalen Prompt analysiert und mit dem Original verglichen. Symmetrisch heißt: keine
+Dimension weicht um mehr als 1 ab, gleiche Muster, gleiches Kennzeichnungsproblem, gleiche Einordnung der Richtung
+und bei Parteinahme die andere Seite begünstigt. Eine Abweichung hat zwei mögliche Ursachen: Die Analyse misst die
+Seiten ungleich, oder die Gegenfassung ist nicht gleich stark geraten. Unterscheiden lässt sich das nur durch Lesen
+der Gegenfassung.
+
+```powershell
+.venv\Scripts\python wertung.py --spiegel
+```
+
+Je Artikel entstehen `spiegel.json` (Gegenfassung mit Streitfrage, Seiten, wichtigsten Ersetzungen),
+`spiegel_text.txt` (zum Lesen) und `spiegel_lauf1.json` (ihre Analyse); `uebersicht.md` bekommt den Abschnitt
+„Spiegelprobe“. Die Gegenfassung ist ein konstruierter Prüftext über echte Personen und Medien: nur zur Messung,
+nicht weitergeben. Sie liegt wie alle Ergebnisse in `ergebnisse/` und damit außerhalb des Repositorys.
+
 ## Addon
 
 ### Laden
@@ -150,6 +175,10 @@ Nach Änderungen am Code auf `chrome://extensions` beim Addon auf ↻ klicken un
   vor den Mustern zeigen dort einen Hinweis; ↻ analysiert neu.
 - „Wer kommt zu Wort“ zeigt die Aussagen je Position als Balken, je Herkunft (Regierung, Wissenschaft …), die
   Stimmen selbst (Klick springt zum ersten Vorkommen) und Genannte ohne eigene Aussage.
+- „Spiegelprobe“ startet nur auf Knopfdruck (zwei API-Aufrufe). Danach: Streitfrage, welche Seite das Original
+  begünstigt, Teilwerte Original gegen Gegenfassung, Muster und Richtung beider Fassungen, Urteil „symmetrisch“ oder
+  „ungleich bewertet“, nicht gespiegelte Stellen und aufklappbar die Gegenfassung mit den wichtigsten Ersetzungen.
+  Das Ergebnis wird je Adresse gemerkt („Zwischenspeicher leeren“ löscht es mit).
 - Fehlermeldungen in der Leiste: kein Artikel erkannt (Knopf „Ganze Seite analysieren“), Schlüssel fehlt/ungültig,
   Guthaben leer, Modell unbekannt, Ratenlimit, API gestört; nicht gefundene Fundstellen stehen mit ⚠ in der Liste.
 - Der Schlüssel liegt nur in `chrome.storage.local` dieses Browserprofils und geht nur an `api.anthropic.com`.

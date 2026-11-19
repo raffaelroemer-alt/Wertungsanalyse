@@ -307,6 +307,14 @@
     .tip .stufe.gewaehlt { background: #fff; color: #1f1f1f; border-color: #fff; font-weight: 600; }
     .fuss { font-size: 11.5px; color: #777; padding-top: 10px; }
     .muster { margin: 6px 0 10px; }
+    .ok { background: #ebf7ee; border: 1px solid #8fd19e; border-radius: 6px; padding: 6px 8px; margin: 6px 0; font-size: 12.5px; }
+    table.vergleich { border-collapse: collapse; width: 100%; margin: 6px 0; font-size: 12.5px; }
+    table.vergleich th { font-weight: 600; color: #666; text-align: left; font-size: 11.5px; }
+    table.vergleich td, table.vergleich th { padding: 2px 4px; }
+    table.vergleich td.zahl { text-align: center; font-weight: 600; }
+    details { margin-top: 8px; }
+    summary { cursor: pointer; font-weight: 600; }
+    .gegentext { white-space: pre-wrap; font-size: 12.5px; background: #fafafa; border: 1px solid #eee; border-radius: 6px; padding: 8px; margin-top: 6px; }
     .pos { margin: 4px 0; }
     .pos-kopf { display: flex; gap: 8px; }
     .pos-kopf span:first-child { flex: 1; }
@@ -328,7 +336,7 @@
 
   const $ = (id) => schatten.getElementById(id);
   const leiste = schatten.querySelector(".leiste");
-  let zustand = { ergebnis: null, karte: null, laeuft: false, port: null };
+  let zustand = { ergebnis: null, karte: null, laeuft: false, port: null, text: "", spiegel: null, spiegelLaeuft: false };
 
   function el(tag, attribute, ...kinder) {
     const e = document.createElement(tag);
@@ -364,13 +372,14 @@
       return;
     }
     zustand.laeuft = true;
+    zustand.text = text;
     ladenZeigen({ phase: "wird vorbereitet", sekunden: 0 });
     const port = chrome.runtime.connect({ name: "analyse" });
     zustand.port = port;
     let erledigt = false;
     port.onMessage.addListener((n) => {
       if (n.art === "stand") ladenZeigen(n);
-      else if (n.art === "fertig") { erledigt = true; zustand.laeuft = false; port.disconnect(); ergebnisZeigen(n.ergebnis, n.ausSpeicher); }
+      else if (n.art === "fertig") { erledigt = true; zustand.laeuft = false; port.disconnect(); zustand.spiegel = n.spiegel || null; ergebnisZeigen(n.ergebnis, n.ausSpeicher); }
       else if (n.art === "fehler") { erledigt = true; zustand.laeuft = false; port.disconnect(); fehlerZeigen(n.code, n.text); }
     });
     port.onDisconnect.addListener(() => {
@@ -487,6 +496,9 @@
     // Wer kommt zu Wort
     abschnitte.push(stimmenAbschnitt(a.stimmen));
 
+    // Spiegelprobe (auf Knopfdruck, eigener API-Aufruf)
+    abschnitte.push(el("section", { id: "spiegel" }, spiegelInhalt()));
+
     // Neutrale Fassung
     abschnitte.push(el("section", {}, el("h2", {}, "Neutrale Fassung"), el("div", {}, a.neutrale_fassung)));
 
@@ -522,6 +534,97 @@
       + `. Analysiert am ${datum}.` + (ausSpeicher ? " Aus dem Zwischenspeicher, ohne neuen API-Aufruf." : "")));
 
     inhaltSetzen(...abschnitte);
+  }
+
+  // ------------------------------------------------------------ Spiegelprobe
+
+  // Schreibt eine Gegenfassung mit vertauschten Seiten und analysiert sie; Vergleich mit der Analyse des Originals.
+  function spiegelStarten() {
+    if (zustand.spiegelLaeuft || !zustand.text) return;
+    zustand.spiegelLaeuft = true;
+    const abschnitt = $("spiegel");
+    const zeigen = (...k) => abschnitt && abschnitt.replaceChildren(...k);
+    zeigen(el("h2", {}, "Spiegelprobe"), el("div", { class: "klein" }, "wird vorbereitet …"));
+    const port = chrome.runtime.connect({ name: "analyse" });
+    let erledigt = false;
+    const ende = () => { erledigt = true; zustand.spiegelLaeuft = false; port.disconnect(); };
+    port.onMessage.addListener((n) => {
+      if (n.art === "stand") {
+        zeigen(el("h2", {}, "Spiegelprobe"),
+          el("div", {}, el("b", {}, n.schritt || ""), ` · ${n.phase || ""} · ${n.sekunden || 0} s`),
+          el("div", { class: "klein" }, "Zwei Aufrufe nacheinander, zusammen etwa so lange wie zwei Analysen."));
+      } else if (n.art === "spiegel_fertig") {
+        ende(); zustand.spiegel = n.spiegel; zeigen(...spiegelInhalt());
+      } else if (n.art === "fehler") {
+        ende(); zeigen(el("h2", {}, "Spiegelprobe"), el("div", { class: "warn" }, n.text),
+          el("button", { onclick: spiegelStarten }, "Noch einmal"));
+      }
+    });
+    port.onDisconnect.addListener(() => {
+      if (erledigt) return;
+      zustand.spiegelLaeuft = false;
+      zeigen(el("h2", {}, "Spiegelprobe"), el("div", { class: "warn" }, "Die Verbindung ist abgebrochen."),
+        el("button", { onclick: spiegelStarten }, "Noch einmal"));
+    });
+    port.postMessage({ art: "spiegel", url: location.href, text: zustand.text });
+  }
+
+  function spiegelInhalt() {
+    const titel = el("h2", {}, "Spiegelprobe");
+    const sp = zustand.spiegel;
+    const a = zustand.ergebnis && zustand.ergebnis.analyse;
+    if (!sp) {
+      return [titel,
+        el("div", { class: "klein" }, "Schreibt eine Gegenfassung des Artikels mit vertauschten Seiten, gleich stark und ohne neue "
+          + "Fakten, und analysiert sie genauso. Wird sie anders bewertet, misst die Analyse die Seiten ungleich."),
+        el("button", { style: "margin-top:6px", onclick: spiegelStarten, title: "Zwei API-Aufrufe, etwa doppelte Kosten" },
+          zustand.text ? "Spiegelprobe starten (2 Aufrufe)" : "Erst neu analysieren (↻)")];
+    }
+    const g = sp.gegenfassung;
+    const neu = el("button", { style: "margin-top:8px", onclick: spiegelStarten, title: "Zwei API-Aufrufe" }, "↻ Spiegelprobe neu");
+    if (!g.spiegelbar || !sp.analyse) {
+      return [titel, el("div", {}, "Nicht spiegelbar: ", g.streitfrage), neu];
+    }
+    const s = sp.analyse;
+    const abweichend = [];
+    const zeilen = Object.entries(DIM).map(([schl, d]) => {
+      const wo = a.teilwerte[schl].wert, ws = s.teilwerte[schl].wert;
+      if (Math.abs(wo - ws) > 1) abweichend.push(d.name);
+      return el("tr", {}, el("td", {}, el("span", { class: "punkt", style: `background:${d.farbe}` }), " ", d.name),
+        el("td", { class: "zahl" }, String(wo)), el("td", { class: "zahl" }, String(ws)),
+        el("td", {}, Math.abs(wo - ws) > 1 ? el("span", { class: "marke" }, "abweichend") : ""));
+    });
+    const arten = (x) => new Set(((x.strategische_muster || {}).muster || []).map((m) => m.art));
+    const mo = arten(a), ms = arten(s);
+    const musterGleich = mo.size === ms.size && [...mo].every((x) => ms.has(x));
+    if (!musterGleich) abweichend.push("Muster");
+    if (a.kennzeichnungsproblem.vorhanden !== s.kennzeichnungsproblem.vorhanden) abweichend.push("Kennzeichnung");
+    if (a.richtung.einordnung !== s.richtung.einordnung) abweichend.push("Richtung");
+    const namen = (menge) => [...menge].map((x) => MUSTER[x] || x).join(", ") || "keine";
+    const richtung = (r) => ({ parteinahme: "Parteinahme", zuspitzung_ohne_parteinahme: "Zuspitzung", keine_erkennbare_richtung: "keine Richtung" }[r.einordnung])
+      + (r.zugunsten.length ? ` zugunsten ${r.zugunsten.join(", ")}` : "");
+    const seite = { seite_a: g.seite_a, seite_b: g.seite_b }[g.original_beguenstigt];
+    return [titel,
+      el("div", { class: "klein" }, "Streitfrage: ", g.streitfrage),
+      seite && el("div", { class: "klein" }, "Das Original begünstigt: ", el("b", {}, seite)),
+      el("div", { class: abweichend.length ? "warn" : "ok" },
+        abweichend.length
+          ? el("span", {}, el("b", {}, "Ungleich bewertet: "), abweichend.join(", "),
+            ". Entweder misst die Analyse die Seiten unterschiedlich, oder die Gegenfassung ist nicht gleich stark geraten. Unten lesen, um das zu unterscheiden.")
+          : el("span", {}, el("b", {}, "Symmetrisch: "), "Die Gegenfassung wird gleich bewertet.")),
+      el("table", { class: "vergleich" },
+        el("tr", {}, el("th", {}, ""), el("th", {}, "Original"), el("th", {}, "Gegenf."), el("th", {}, "")), zeilen),
+      el("div", { class: "klein" }, "Muster: ", namen(mo), musterGleich ? "" : ` · Gegenfassung: ${namen(ms)}`),
+      el("div", { class: "klein" }, "Richtung: ", richtung(a.richtung), " · Gegenfassung: ", richtung(s.richtung)),
+      g.nicht_gespiegelt.length > 0 && el("div", { class: "klein", style: "margin-top:4px" },
+        `Nicht gespiegelt (${g.nicht_gespiegelt.length}): `, g.nicht_gespiegelt.join(" · ")),
+      el("details", {},
+        el("summary", {}, "Gegenfassung lesen"),
+        el("div", { class: "warn" }, "Konstruierter Prüftext mit vertauschten Seiten, kein echter Artikel. Nicht weitergeben."),
+        g.tausch.length > 0 && el("ul", {}, g.tausch.map((t) => el("li", { class: "klein" }, `„${t.original}“ → „${t.spiegel}“`))),
+        el("div", { class: "gegentext" }, g.text)),
+      el("div", { class: "klein" }, "Ein einzelner Lauf schwankt; erst wiederholte Abweichungen sind aussagekräftig."),
+      neu];
   }
 
   // Verzeichnis der Stimmen: Aussagen je Position (Balken), je Typ, die Stimmen selbst, Akteure ohne Stimme
