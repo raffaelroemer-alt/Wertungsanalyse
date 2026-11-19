@@ -206,26 +206,113 @@ def kennzahl_text(k: dict) -> str:
     return text
 
 
+# ---------------------------------------------------------------- Schema
+
+# Die API übersetzt das Antwortschema in eine Grammatik und lehnt zu große Grammatiken ab ("compiled grammar
+# is too large"). Auswahllisten (enum) vergrößern sie stark. Deshalb geht das Schema ohne enum an die API
+# (die erlaubten Werte stehen in der Beschreibung und im Prompt), und die Antwort wird hier gegen das volle
+# Schema geprüft. Dieselbe Regel nutzt das Addon (hintergrund.js).
+
+def api_schema(schema):
+    """Kopie des Schemas ohne enum; die erlaubten Werte wandern in die description."""
+    if isinstance(schema, list):
+        return [api_schema(x) for x in schema]
+    if not isinstance(schema, dict):
+        return schema
+    neu = {k: api_schema(v) for k, v in schema.items() if k != "enum"}
+    if isinstance(schema.get("enum"), list):
+        werte = ", ".join(str(w) for w in schema["enum"])
+        neu["description"] = (schema["description"] + ". " if schema.get("description") else "") + f"Erlaubte Werte: {werte}"
+    return neu
+
+
+def _aufloesen(schema: dict, defs: dict) -> dict:
+    return defs[schema["$ref"].split("/")[-1]] if "$ref" in schema else schema
+
+
+def enums_angleichen(wert, schema: dict, defs: dict | None = None):
+    """Gleicht Groß/Klein von enum-Werten an (die API garantiert die Schreibung nicht)."""
+    defs = schema.get("$defs", {}) if defs is None else defs
+    schema = _aufloesen(schema, defs)
+    if isinstance(wert, str) and isinstance(schema.get("enum"), list) and wert not in schema["enum"]:
+        treffer = [e for e in schema["enum"] if isinstance(e, str) and e.casefold() == wert.strip().casefold()]
+        return treffer[0] if treffer else wert
+    if isinstance(wert, dict):
+        props = schema.get("properties", {})
+        return {k: enums_angleichen(v, props[k], defs) if k in props else v for k, v in wert.items()}
+    if isinstance(wert, list) and isinstance(schema.get("items"), dict):
+        return [enums_angleichen(x, schema["items"], defs) for x in wert]
+    return wert
+
+
+def schema_fehler(wert, schema: dict, pfad: str = "$", defs: dict | None = None) -> list[str]:
+    """Prüft type, required, additionalProperties, enum, items und $ref (ohne Zusatzpaket)."""
+    defs = schema.get("$defs", {}) if defs is None else defs
+    schema = _aufloesen(schema, defs)
+    typ = schema.get("type")
+    if typ == "integer" and not (isinstance(wert, int) and not isinstance(wert, bool)):
+        return [f"{pfad}: keine Ganzzahl"]
+    erwartet = {"object": dict, "array": list, "string": str, "boolean": bool}.get(typ)
+    if erwartet and not isinstance(wert, erwartet):
+        return [f"{pfad}: erwartet {typ}"]
+    f = []
+    if "enum" in schema and wert not in schema["enum"]:
+        f.append(f"{pfad}: {wert!r} nicht erlaubt")
+    if typ == "object":
+        f += [f"{pfad}.{k}: fehlt" for k in schema.get("required", []) if k not in wert]
+        if schema.get("additionalProperties") is False:
+            f += [f"{pfad}.{k}: unbekannt" for k in wert if k not in schema.get("properties", {})]
+        for k, s in schema.get("properties", {}).items():
+            if k in wert:
+                f += schema_fehler(wert[k], s, f"{pfad}.{k}", defs)
+    if typ == "array" and isinstance(schema.get("items"), dict):
+        for i, x in enumerate(wert):
+            f += schema_fehler(x, schema["items"], f"{pfad}[{i}]", defs)
+    return f
+
+
 # ---------------------------------------------------------------- API-Aufruf
 
 def analysieren(client, artikeltext: str, modell: str, effort: str, fallback: bool) -> tuple[dict, dict]:
-    return _anfrage(client, "prompt.md", "schema.json", artikeltext, modell, effort, fallback)
+    # Ohne erzwungenes Format: Das Analyseschema ist für die Grammatik der API zu groß ("compiled grammar is too
+    # large"). Das Schema steht im Prompt, die Antwort wird gegen das volle Schema geprüft.
+    return _anfrage(client, "prompt.md", "schema.json", artikeltext, modell, effort, fallback, erzwungen=False)
 
 
 def spiegeln(client, artikeltext: str, modell: str, effort: str, fallback: bool) -> tuple[dict, dict]:
     """Gegenfassung mit vertauschten Seiten (Spiegelprobe), gleiche Machart und Stärke wie das Original."""
-    return _anfrage(client, "spiegel_prompt.md", "spiegel_schema.json", artikeltext, modell, effort, fallback)
+    return _anfrage(client, "spiegel_prompt.md", "spiegel_schema.json", artikeltext, modell, effort, fallback,
+                    erzwungen=True)
+
+
+def mit_schema(prompt: str, schema: dict) -> str:
+    """Prompt plus Schema als Text, für Anfragen ohne erzwungenes Format (wie im Addon)."""
+    return f"{prompt.rstrip()}\n\n<schema>\n{json.dumps(schema, ensure_ascii=False, separators=(",", ":"))}\n</schema>\n"
+
+
+def json_aus_text(text: str):
+    """JSON aus der Antwort, auch wenn das Modell doch eine Codeblock-Markierung oder einen Satz davor schreibt."""
+    t = text.strip()
+    anfang, ende = t.find("{"), t.rfind("}")
+    if anfang < 0 or ende < anfang:
+        raise json.JSONDecodeError("kein JSON-Objekt in der Antwort", t, 0)
+    return json.loads(t[anfang:ende + 1])
 
 
 def _anfrage(client, prompt_datei: str, schema_datei: str, artikeltext: str, modell: str, effort: str,
-             fallback: bool) -> tuple[dict, dict]:
+             fallback: bool, erzwungen: bool) -> tuple[dict, dict]:
     system = (KERN / prompt_datei).read_text(encoding="utf-8")
     schema = json.loads((KERN / schema_datei).read_text(encoding="utf-8"))
+    ausgabe = {"effort": effort}
+    if erzwungen:
+        ausgabe["format"] = {"type": "json_schema", "schema": api_schema(schema)}
+    else:
+        system = mit_schema(system, schema)
     anfrage = dict(
         model=modell,
         max_tokens=MAX_TOKENS,
         thinking={"type": "adaptive"},
-        output_config={"effort": effort, "format": {"type": "json_schema", "schema": schema}},
+        output_config=ausgabe,
         system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
         messages=[{"role": "user", "content": f"<artikel>\n{artikeltext.strip()}\n</artikel>"}],
     )
@@ -241,7 +328,10 @@ def _anfrage(client, prompt_datei: str, schema_datei: str, artikeltext: str, mod
     if antwort.stop_reason == "max_tokens":
         raise RuntimeError(f"Antwort abgeschnitten (max_tokens={MAX_TOKENS} erreicht).")
     text = next(b.text for b in antwort.content if b.type == "text")
-    analyse = json.loads(text)
+    analyse = enums_angleichen(json_aus_text(text), schema)
+    fehler = schema_fehler(analyse, schema)
+    if fehler:
+        raise RuntimeError(f"Antwort passt nicht zum Schema ({len(fehler)} Stellen): " + "; ".join(fehler[:5]))
 
     u = antwort.usage
     ein, aus, cache_lesen = PREISE.get(modell, (0, 0, 0))

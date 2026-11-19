@@ -163,3 +163,7 @@ Kurze Hinweise zu Unsicherheiten, fehlendem Kontext, Stellen, deren Beurteilung 
 ## Sprache
 
 Alle Texte auf Deutsch, knapp und sachlich. Begründungen ein Satz.
+
+## Ausgabeformat
+
+Antworte ausschließlich mit einem einzigen JSON-Objekt, das dem JSON-Schema im Block `<schema>` am Ende entspricht: genau die Feldnamen des Schemas, alle Pflichtfelder, keine weiteren Felder, bei Feldern mit `enum` nur die dort genannten Werte in genau dieser Schreibung, Ganzzahlen als Zahlen. Kein Text vor oder nach dem JSON, keine Codeblock-Markierung.

@@ -49,7 +49,16 @@ mit einer Marke am Zeilenanfang kennzeichnen: `[Bildunterschrift]`, `[Kasten]`, 
 
 ### Was die Prüfung meldet
 
-Das Schema erzwingt Felder und Werte, aber nicht die Zitatregeln. `pruefung` in jeder Ergebnisdatei nennt:
+**Format der Antwort.** Erzwungene strukturierte Ausgabe (`output_config.format`) übersetzt das Schema in eine
+Grammatik; für das Analyseschema ist sie zu groß („compiled grammar is too large“), auch ohne Auswahllisten. Die
+Analyse läuft deshalb **ohne erzwungenes Format**: `schema.json` wird als Block `<schema>` an den Prompt gehängt,
+der Abschnitt „Ausgabeformat“ in `prompt.md` verlangt reines JSON danach. Skript und Addon holen das JSON aus der
+Antwort (auch mit Codeblock-Markierung), gleichen Groß/Kleinschreibung von Auswahlwerten an und prüfen gegen das
+volle Schema (Pflichtfelder, Typen, erlaubte Werte); passt es nicht, gibt es eine Fehlermeldung statt eines
+falschen Ergebnisses. Die kleine Gegenfassung der Spiegelprobe nutzt weiter das erzwungene Format (ohne `enum`).
+`schema.json` bleibt die eine Quelle für alles.
+
+Die Prüfung gegen das Schema deckt Felder, Typen und Werte ab, aber nicht die Zitatregeln. `pruefung` in jeder Ergebnisdatei nennt:
 Zitate, die nicht wörtlich im Artikel stehen (verglichen nach Vereinheitlichung von Anführungszeichen, Strichen,
 Leerraum und Groß/Klein – dieselbe Regel nutzt das Addon), Zitate über zehn Wörter, mehrdeutige Zitate,
 Richtungsbelege ohne Markierung, Teilwerte ohne Markierung und umgekehrt. Für die strategischen Muster außerdem:

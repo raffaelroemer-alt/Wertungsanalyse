@@ -418,7 +418,8 @@
       knoepfe.push(el("button", { onclick: () => starten() }, "Noch einmal"));
     }
     inhaltSetzen(el("div", { class: "fehler" }, el("b", {}, titel), el("div", {}, text),
-      el("div", { style: "margin-top:8px; display:flex; gap:6px;" }, knoepfe)));
+      el("div", { style: "margin-top:8px; display:flex; gap:6px;" }, knoepfe),
+      el("div", { class: "klein", style: "margin-top:8px" }, `Addon-Version ${chrome.runtime.getManifest().version}`)));
   }
 
   function ergebnisZeigen(ergebnis, ausSpeicher) {

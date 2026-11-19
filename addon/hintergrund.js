@@ -92,8 +92,10 @@ function speicherSchluessel(url) {
   return "ergebnis:" + u.toString();
 }
 
+// Die Analyse läuft ohne erzwungenes Format: Ihr Schema ist für die Grammatik der API zu groß
+// ("compiled grammar is too large"). Das Schema steht im Prompt, die Antwort wird gegen das volle Schema geprüft.
 async function analysieren(text, melden, signal) {
-  const { daten, meta } = await apiAufruf("analyse/prompt.md", "analyse/schema.json", text, melden, signal);
+  const { daten, meta } = await apiAufruf("analyse/prompt.md", "analyse/schema.json", text, melden, signal, false);
   return { analyse: daten, meta };
 }
 
@@ -101,7 +103,7 @@ async function analysieren(text, melden, signal) {
 async function spiegelprobe(text, senden, signal) {
   const schritt = (name) => (stand) => senden({ art: "stand", schritt: name, ...stand });
   const gegen = await apiAufruf("analyse/spiegel_prompt.md", "analyse/spiegel_schema.json", text,
-    schritt("Gegenfassung schreiben (1/2)"), signal);
+    schritt("Gegenfassung schreiben (1/2)"), signal, true);
   const spiegel = { gegenfassung: gegen.daten, meta_gegenfassung: gegen.meta, analyse: null, meta: null };
   if (gegen.daten.spiegelbar && gegen.daten.text.trim()) {
     const a = await analysieren(gegen.daten.text, schritt("Gegenfassung analysieren (2/2)"), signal);
@@ -111,7 +113,7 @@ async function spiegelprobe(text, senden, signal) {
   return spiegel;
 }
 
-async function apiAufruf(promptDatei, schemaDatei, text, melden, signal) {
+async function apiAufruf(promptDatei, schemaDatei, text, melden, signal, erzwungen) {
   const einst = { ...VORGABEN, ...(await chrome.storage.local.get(["apiKey", "modell", "effort"])) };
   if (!einst.apiKey) throw new Fehler("schluessel", "Kein API-Schlüssel gespeichert. Bitte auf der Einstellungsseite eintragen.");
   if (text.length > MAX_ZEICHEN) throw new Fehler("zu_lang", `Der Artikel ist zu lang (${text.length} Zeichen, höchstens ${MAX_ZEICHEN}).`);
@@ -125,8 +127,10 @@ async function apiAufruf(promptDatei, schemaDatei, text, melden, signal) {
     max_tokens: MAX_TOKENS,
     stream: true,
     thinking: { type: "adaptive" },
-    output_config: { effort: einst.effort, format: { type: "json_schema", schema } },
-    system: [{ type: "text", text: prompt, cache_control: { type: "ephemeral" } }],
+    output_config: erzwungen
+      ? { effort: einst.effort, format: { type: "json_schema", schema: apiSchema(schema) } }
+      : { effort: einst.effort },
+    system: [{ type: "text", text: erzwungen ? prompt : mitSchema(prompt, schema), cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: `<artikel>\n${text.trim()}\n</artikel>` }],
   };
   const kopf = {
@@ -154,7 +158,12 @@ async function apiAufruf(promptDatei, schemaDatei, text, melden, signal) {
     }
     if (!antwort.ok) throw await apiFehler(antwort, einst.modell);
     const ergebnis = await stromLesen(antwort, melden, beginn);
-    return { daten: auswerten(ergebnis), meta: metaDaten(ergebnis, einst, beginn) };
+    const daten = enumsAngleichen(auswerten(ergebnis), schema);
+    const fehler = schemaFehler(daten, schema);
+    if (fehler.length) {
+      throw new Fehler("format", `Die Antwort passt nicht zum Schema (${fehler.length} Stellen): ${fehler.slice(0, 3).join("; ")}`);
+    }
+    return { daten, meta: metaDaten(ergebnis, einst, beginn) };
   } finally {
     clearInterval(wach);
   }
@@ -234,14 +243,75 @@ async function stromLesen(antwort, melden, beginn) {
   return st;
 }
 
+// ---------------------------------------------------------------- Schema (wie wertung.py)
+
+// Die API lehnt zu große Grammatiken ab ("compiled grammar is too large"); enum vergrößert sie stark.
+// Deshalb geht das Schema ohne enum an die API, die Antwort wird hier gegen das volle Schema geprüft.
+function apiSchema(s) {
+  if (Array.isArray(s)) return s.map(apiSchema);
+  if (!s || typeof s !== "object") return s;
+  const neu = {};
+  for (const [k, v] of Object.entries(s)) if (k !== "enum") neu[k] = apiSchema(v);
+  if (Array.isArray(s.enum)) neu.description = (s.description ? s.description + ". " : "") + "Erlaubte Werte: " + s.enum.join(", ");
+  return neu;
+}
+
+const aufloesen = (s, defs) => (s && s.$ref ? defs[s.$ref.split("/").pop()] : s);
+
+// Groß/Klein von enum-Werten angleichen (die API garantiert die Schreibung nicht)
+function enumsAngleichen(wert, schema, defs = schema.$defs || {}) {
+  const s = aufloesen(schema, defs);
+  if (typeof wert === "string" && Array.isArray(s.enum) && !s.enum.includes(wert)) {
+    const t = s.enum.find((e) => typeof e === "string" && e.toLowerCase() === wert.trim().toLowerCase());
+    return t === undefined ? wert : t;
+  }
+  if (Array.isArray(wert)) return s.items ? wert.map((x) => enumsAngleichen(x, s.items, defs)) : wert;
+  if (wert && typeof wert === "object") {
+    const props = s.properties || {};
+    return Object.fromEntries(Object.entries(wert).map(([k, v]) => [k, props[k] ? enumsAngleichen(v, props[k], defs) : v]));
+  }
+  return wert;
+}
+
+function schemaFehler(wert, schema, pfad = "$", defs = schema.$defs || {}) {
+  const s = aufloesen(schema, defs);
+  const typ = s.type;
+  const istObjekt = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
+  const passt = { object: istObjekt, array: Array.isArray, string: (x) => typeof x === "string",
+    boolean: (x) => typeof x === "boolean", integer: Number.isInteger }[typ];
+  if (passt && !passt(wert)) return [`${pfad}: erwartet ${typ}`];
+  const f = [];
+  if (Array.isArray(s.enum) && !s.enum.includes(wert)) f.push(`${pfad}: ${JSON.stringify(wert)} nicht erlaubt`);
+  if (typ === "object") {
+    for (const k of s.required || []) if (!(k in wert)) f.push(`${pfad}.${k}: fehlt`);
+    if (s.additionalProperties === false) for (const k of Object.keys(wert)) if (!(k in (s.properties || {}))) f.push(`${pfad}.${k}: unbekannt`);
+    for (const [k, t] of Object.entries(s.properties || {})) if (k in wert) f.push(...schemaFehler(wert[k], t, `${pfad}.${k}`, defs));
+  }
+  if (typ === "array" && s.items) wert.forEach((x, i) => f.push(...schemaFehler(x, s.items, `${pfad}[${i}]`, defs)));
+  return f;
+}
+
 function auswerten(st) {
   if (st.stop === "refusal") throw new Fehler("abgelehnt", "Das Modell hat die Analyse dieses Textes abgelehnt.");
   if (st.stop === "max_tokens") throw new Fehler("abgeschnitten", `Die Antwort wurde abgeschnitten (max_tokens ${MAX_TOKENS}).`);
   try {
-    return JSON.parse(st.text);
+    return jsonAusText(st.text);
   } catch {
     throw new Fehler("format", "Die Antwort war kein gültiges JSON.");
   }
+}
+
+// Prompt plus Schema als Text, für Anfragen ohne erzwungenes Format (wie wertung.py)
+function mitSchema(prompt, schema) {
+  return `${prompt.trimEnd()}\n\n<schema>\n${JSON.stringify(schema)}\n</schema>\n`;
+}
+
+// JSON aus der Antwort, auch wenn das Modell doch eine Codeblock-Markierung oder einen Satz davor schreibt
+function jsonAusText(text) {
+  const t = text.trim();
+  const anfang = t.indexOf("{"), ende = t.lastIndexOf("}");
+  if (anfang < 0 || ende < anfang) throw new SyntaxError("kein JSON-Objekt");
+  return JSON.parse(t.slice(anfang, ende + 1));
 }
 
 function metaDaten(st, einst, beginn) {
