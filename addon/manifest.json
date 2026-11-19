@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Wertungsanalyse",
+  "version": "0.1.0",
+  "description": "Analysiert den Artikel im aktiven Tab auf Wertung und markiert die Stellen (privat, eigener API-Schlüssel).",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["https://api.anthropic.com/*"],
+  "background": {"service_worker": "hintergrund.js"},
+  "action": {"default_title": "Artikel auf Wertung analysieren"},
+  "options_page": "einstellungen.html",
+  "minimum_chrome_version": "116"
+}

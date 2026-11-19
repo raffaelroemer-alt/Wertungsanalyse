@@ -1,0 +1,96 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["textlage", "gattung", "kennzeichnungsproblem", "markierungen", "teilwerte", "richtung", "kennzahl", "neutrale_fassung", "hinweise"],
+  "properties": {
+    "textlage": {
+      "type": "string",
+      "enum": ["vollstaendig", "unvollstaendig", "nur_zusammenfassung", "kein_artikel"]
+    },
+    "gattung": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["art", "begruendung"],
+      "properties": {
+        "art": {
+          "type": "string",
+          "enum": ["Agenturmeldung", "Bericht", "Analyse/Erklärstück", "Reportage", "Interview", "Kommentar/Meinung", "Glosse", "Chronik/Liste", "Lagebericht", "Pressemitteilung", "Behördenkommunikation", "sonstige"]
+        },
+        "begruendung": {"type": "string"}
+      }
+    },
+    "kennzeichnungsproblem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vorhanden", "begruendung"],
+      "properties": {
+        "vorhanden": {"type": "boolean"},
+        "begruendung": {"type": "string"}
+      }
+    },
+    "markierungen": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["zitat", "dimension", "begruendung", "alternative", "strittig", "ausserhalb_zaehlbasis", "nur_struktur"],
+        "properties": {
+          "zitat": {"type": "string", "description": "zeichengenau aus dem Artikel, höchstens zehn Wörter"},
+          "dimension": {"type": "string", "enum": ["wortwahl", "epistemisch", "quellen", "auswahl", "ueberschrift"]},
+          "begruendung": {"type": "string"},
+          "alternative": {"type": "string"},
+          "strittig": {"type": "boolean"},
+          "ausserhalb_zaehlbasis": {"type": "boolean"},
+          "nur_struktur": {"type": "boolean"}
+        }
+      }
+    },
+    "teilwerte": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wortwahl", "epistemisch", "quellen", "auswahl", "ueberschrift"],
+      "properties": {
+        "wortwahl": {"$ref": "#/$defs/teilwert"},
+        "epistemisch": {"$ref": "#/$defs/teilwert"},
+        "quellen": {"$ref": "#/$defs/teilwert"},
+        "auswahl": {"$ref": "#/$defs/teilwert"},
+        "ueberschrift": {"$ref": "#/$defs/teilwert"}
+      }
+    },
+    "richtung": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["einordnung", "zugunsten", "zulasten", "belege", "begruendung"],
+      "properties": {
+        "einordnung": {"type": "string", "enum": ["parteinahme", "zuspitzung_ohne_parteinahme", "keine_erkennbare_richtung"]},
+        "zugunsten": {"type": "array", "items": {"type": "string"}},
+        "zulasten": {"type": "array", "items": {"type": "string"}},
+        "belege": {"type": "array", "items": {"type": "string"}},
+        "begruendung": {"type": "string"}
+      }
+    },
+    "kennzahl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["markiert", "gesamt", "strittig"],
+      "properties": {
+        "markiert": {"type": "integer"},
+        "gesamt": {"type": "integer"},
+        "strittig": {"type": "integer"}
+      }
+    },
+    "neutrale_fassung": {"type": "string"},
+    "hinweise": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "teilwert": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wert", "begruendung"],
+      "properties": {
+        "wert": {"type": "integer", "enum": [0, 1, 2, 3, 4]},
+        "begruendung": {"type": "string"}
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+# Artikeltexte und Analyseergebnisse (enthalten Artikelzitate) nie einchecken
+testartikel/
+ergebnisse/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Schlüssel gehören nie ins Repository
+.env
+*.key

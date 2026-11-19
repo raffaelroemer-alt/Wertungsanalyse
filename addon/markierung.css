@@ -1,0 +1,36 @@
+/* Markierungen im Artikel. Eigenes Element <wa-mark>, damit Seitenstile für <mark> nicht greifen. */
+wa-mark { --wa: 120, 120, 120; }
+wa-mark.wa-wortwahl { --wa: 232, 128, 0; }
+wa-mark.wa-epistemisch { --wa: 156, 54, 181; }
+wa-mark.wa-quellen { --wa: 28, 126, 214; }
+wa-mark.wa-auswahl { --wa: 47, 158, 68; }
+wa-mark.wa-ueberschrift { --wa: 224, 49, 49; }
+
+wa-mark {
+  display: inline !important;
+  background: rgba(var(--wa), 0.22) !important;
+  border-bottom: 2px solid rgb(var(--wa)) !important;
+  border-radius: 2px !important;
+  color: inherit !important;
+  cursor: help !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+wa-mark.wa-strittig {
+  background: rgba(var(--wa), 0.08) !important;
+  border-bottom: 2px dashed rgb(var(--wa)) !important;
+}
+wa-mark.wa-struktur {
+  background: transparent !important;
+  border-bottom: 2px dotted rgb(var(--wa)) !important;
+}
+wa-mark.wa-blinken {
+  outline: 3px solid rgb(var(--wa)) !important;
+  outline-offset: 2px !important;
+}
+html.wa-aus wa-mark {
+  background: none !important;
+  border: 0 !important;
+  outline: 0 !important;
+  cursor: auto !important;
+}
