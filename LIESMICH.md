@@ -95,12 +95,14 @@ Rundfunkbeitrags sind frei erfunden: Namen, Zahlen, Domains (`.example`).
 | `rundfunk_bericht_pro` / `_kontra` | als Bericht aufgemacht, aber durchgehend parteiisch; alle sechs Muster, „sogenannt“, wertende Redeverben, gespiegelt Satz für Satz |
 | `rundfunk_kommentar_pro` / `_kontra` | gekennzeichneter Kommentar derselben Quelle, dieselben Leitbegriffe wie der Bericht |
 | `rundfunk_neutral` | Kontrolle: dieselben Fakten, die Kampfbegriffe beider Seiten nur in zugeschriebenen Zitaten |
+| `stadtwerke_bericht_pro` / `_kontra` | Verkauf von Anteilen der (erfundenen) Stadtwerke Lindenau, als Lokalbericht aufgemacht; nur Angstappell und Sündenbock, sonst keine Muster. Gespiegelt: Bedrohung durch Scheitern bzw. Gelingen des Verkaufs, Schuld bei „Gewerkschaftsfunktionären“ bzw. „Rathausbürokraten“. Der Text nennt selbst andere Ursachen des Verlusts (Gutachten), das macht die Schuldzuweisung zum Sündenbock |
 
 ```powershell
 .venv\Scripts\python wertung.py --ordner spiegeltests --ergebnisse ergebnisse\spiegel
 ```
 
-Fünf Artikel × zwei Läufe = zehn API-Aufrufe. `uebersicht.md` hat dann drei zusätzliche Abschnitte:
+Sieben Artikel × zwei Läufe = 14 API-Aufrufe (vorhandene Läufe werden nicht neu bezahlt, `--nur stadtwerke`
+analysiert nur das neue Paar). `uebersicht.md` hat dann drei zusätzliche Abschnitte:
 - **Spiegelpaare:** `<stamm>_pro` gegen `<stamm>_kontra`. Die Teilwerte werden über alle Läufe gemittelt.
   Symmetrisch heißt: keine Dimension weicht um mehr als 1 ab, gleiche Muster (in mindestens der Hälfte der
   Läufe) und gleiches Kennzeichnungsproblem. Die Richtung muss man selbst ansehen: Sie soll gespiegelt sein.

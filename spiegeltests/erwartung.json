@@ -34,5 +34,19 @@
     "muster_keine": true,
     "nicht_markiert": ["Staatsfunk", "Zwangsgebühr", "Gleichwertigkeit", "gemeinsamer Rundfunk"],
     "leitbegriffe_nicht": ["Zwangsgebühr", "Staatsfunk", "Rundfunkbeteiligung", "Profitsender", "gemeinsamer Rundfunk", "Gleichwertigkeit"]
+  },
+  "stadtwerke_bericht_pro": {
+    "gattung": ["Bericht", "Kommentar/Meinung", "Analyse/Erklärstück"],
+    "richtung": ["parteinahme"],
+    "muster_mind": ["angstappell", "suendenbock"],
+    "markiert_enthaelt": ["Krämer behauptet"],
+    "nicht_markiert": ["Netzentgelte", "Grundversorgungstarif"]
+  },
+  "stadtwerke_bericht_kontra": {
+    "gattung": ["Bericht", "Kommentar/Meinung", "Analyse/Erklärstück"],
+    "richtung": ["parteinahme"],
+    "muster_mind": ["angstappell", "suendenbock"],
+    "markiert_enthaelt": ["Haas behauptet"],
+    "nicht_markiert": ["Netzentgelte", "Grundversorgungstarif"]
   }
 }
