@@ -28,7 +28,7 @@ chrome.action.onClicked.addListener(async (tab) => {
   }
   try {
     await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: ["markierung.css"] });
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["lib/Readability.js", "inhalt.js"] });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["lib/Readability.js", "gemeinsam.js", "inhalt.js"] });
   } catch (e) {
     hinweisAmSymbol(tab.id, "Diese Seite lässt keine Erweiterungen zu: " + e.message);
   }
@@ -44,9 +44,21 @@ function hinweisAmSymbol(tabId, text) {
   }, 6000);
 }
 
-chrome.runtime.onMessage.addListener((nachricht) => {
+chrome.runtime.onMessage.addListener((nachricht, absender) => {
   if (nachricht?.art === "einstellungen_oeffnen") chrome.runtime.openOptionsPage();
+  if (nachricht?.art === "bericht_oeffnen") berichtOeffnen(nachricht.daten, absender.tab);
 });
+
+// Bericht: Daten unter eigener Nummer ablegen (nur die letzten fünf bleiben), Druckansicht neben dem Artikel öffnen
+const BERICHTE_BEHALTEN = 5;
+async function berichtOeffnen(daten, tab) {
+  const id = Date.now().toString(36);
+  const alt = Object.keys(await chrome.storage.local.get(null)).filter((k) => k.startsWith("bericht:")).sort();
+  await chrome.storage.local.remove(alt.slice(0, Math.max(0, alt.length - (BERICHTE_BEHALTEN - 1))));
+  await chrome.storage.local.set({ ["bericht:" + id]: daten });
+  await chrome.tabs.create({ url: chrome.runtime.getURL("bericht.html?id=" + id),
+    ...(tab ? { index: tab.index + 1, openerTabId: tab.id } : {}) });
+}
 
 // ---------------------------------------------------------------- Analyse über einen Port
 

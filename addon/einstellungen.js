@@ -44,7 +44,7 @@ $("modellSpeichern").addEventListener("click", async () => {
 
 $("speicherLeeren").addEventListener("click", async () => {
   const alles = await chrome.storage.local.get(null);
-  await chrome.storage.local.remove(Object.keys(alles).filter((k) => k.startsWith("ergebnis:") || k.startsWith("spiegel:")));
+  await chrome.storage.local.remove(Object.keys(alles).filter((k) => k.startsWith("ergebnis:") || k.startsWith("spiegel:") || k.startsWith("bericht:")));
   anzeigen();
 });
 

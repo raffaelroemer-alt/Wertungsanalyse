@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Wertungsanalyse – Bericht</title>
+<link rel="stylesheet" href="bericht.css">
+</head>
+<body>
+<div class="werkzeug" id="werkzeug">
+  <div class="werkzeug-zeile">
+    <b>Druckansicht</b>
+    <label><input type="checkbox" id="mitArtikel" checked> Artikeltext mit Markierungen</label>
+    <label><input type="checkbox" id="mitNeutral" checked> Neutrale Fassung</label>
+    <label id="wahlGegen" hidden><input type="checkbox" id="mitGegen" checked> Gegenfassung</label>
+    <button id="drucken">Als PDF speichern …</button>
+  </div>
+  <div class="werkzeug-hinweis">Im Druckdialog als Ziel <b>„Als PDF speichern“</b> wählen. Unter „Weitere Einstellungen“
+    die <b>Kopf- und Fußzeilen</b> ausschalten – Seitenzahlen setzt der Bericht selbst.</div>
+</div>
+<main id="bericht"></main>
+<script src="gemeinsam.js"></script>
+<script src="bericht.js"></script>
+</body>
+</html>

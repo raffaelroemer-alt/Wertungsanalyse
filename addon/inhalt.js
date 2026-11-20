@@ -4,61 +4,8 @@
   if (window.__wertungsanalyse) { window.__wertungsanalyse.klick(); return; }
   const WA = (window.__wertungsanalyse = {});
 
-  const DIM = {
-    wortwahl: { name: "Wortwahl", farbe: "rgb(232,128,0)" },
-    epistemisch: { name: "Epistemische Rahmung", farbe: "rgb(156,54,181)" },
-    quellen: { name: "Quellen & Zuschreibung", farbe: "rgb(28,126,214)" },
-    auswahl: { name: "Auswahl & Gewichtung", farbe: "rgb(47,158,68)" },
-    ueberschrift: { name: "Überschrift & Vorspann", farbe: "rgb(224,49,49)" },
-  };
-  const MUSTER = {
-    moralische_klammer: "Moralische Klammer",
-    moralische_delegitimierung: "Moralische Delegitimierung",
-    dichotomie: "Dichotomie",
-    vereinnahmendes_wir: "Vereinnahmendes Wir",
-    umbenennung: "Umbenennung",
-    leitbegriff_wiederholung: "Leitbegriff-Wiederholung",
-    angstappell: "Angstappell",
-    suendenbock: "Sündenbock",
-  };
-  const STIMMEN_TYP = {
-    regierung_verwaltung: "Regierung/Verwaltung", partei_parlament: "Partei/Parlament", justiz: "Justiz",
-    sicherheit: "Polizei/Militär", wirtschaft: "Wirtschaft", verband: "Verband/Gewerkschaft",
-    zivilgesellschaft: "Zivilgesellschaft", wissenschaft: "Wissenschaft", internationale_organisation: "Internat. Organisation",
-    medien: "Medien", betroffene: "Betroffene/Bürger", sonstige: "Sonstige",
-  };
-  const VERMERK = { angefragt_ohne_antwort: "angefragt, keine Antwort", aeusserung_abgelehnt: "wollte sich nicht äußern" };
-  const GATTUNG_KOMMENTAR =new Set(["Kommentar/Meinung", "Glosse"]);
-  const MIN_SAETZE_FUER_ANTEIL = 15;
-
-  // ------------------------------------------------------------ Vereinheitlichung (wie wertung.py)
-
-  const ERSETZEN = {
-    "„": '"', "“": '"', "”": '"', "«": '"', "»": '"', "‟": '"', "″": '"',
-    "‚": "'", "‘": "'", "’": "'", "‹": "'", "›": "'", "´": "'", "`": "'",
-    "–": "-", "—": "-", "‑": "-", "‐": "-", "−": "-",
-  };
-  const UNSICHTBAR = new Set(["­", "​", "‌", "‍", "﻿"]);
-
-  // Ein Zeichen in Vergleichsform: "" = weglassen, " " = Leerraum, sonst ein Zeichen
-  function zeichen(c) {
-    if (UNSICHTBAR.has(c)) return "";
-    if (/\s/.test(c)) return " ";
-    const m = ERSETZEN[c] || c;
-    const k = m.toLowerCase();
-    return k.length === 1 ? k : m;
-  }
-
-  function normalisieren(text) {
-    let aus = "";
-    for (const c of text.normalize("NFC")) {
-      const z = zeichen(c);
-      if (z === "") continue;
-      if (z === " " && (aus === "" || aus.endsWith(" "))) continue;
-      aus += z;
-    }
-    return aus.trimEnd();
-  }
+  const { DIM, MUSTER, STIMMEN_TYP, VERMERK, RICHTUNG, TEXTLAGE, GATTUNG_KOMMENTAR, STUFEN,
+    zeichen, normalisieren, kennzahlText, spiegelVergleich, stimmenZaehlen, metaText, el } = globalThis.WA_GEMEINSAM;
 
   // ------------------------------------------------------------ Artikeltext
 
@@ -268,6 +215,7 @@
     header h1 { font-size: 15px; margin: 0; flex: 1; }
     button { font: inherit; font-size: 12.5px; border: 1px solid #ccc; background: #fff; border-radius: 6px; padding: 3px 8px; cursor: pointer; color: inherit; }
     button:hover { background: #f0f0f0; }
+    button:disabled { opacity: .45; cursor: default; background: #fff; }
     label.schalter { display: flex; align-items: center; gap: 4px; font-size: 12.5px; cursor: pointer; }
     .inhalt { overflow-y: auto; padding: 4px 14px 24px; flex: 1; }
     section { padding: 10px 0; border-bottom: 1px solid #eee; }
@@ -325,6 +273,7 @@
     <header>
       <h1>Wertungsanalyse</h1>
       <label class="schalter" title="Markierungen im Artikel ein- oder ausblenden"><input type="checkbox" id="an" checked> Markierungen</label>
+      <button id="pdf" title="Bericht als PDF (öffnet die Druckansicht in einem neuen Tab)" disabled>PDF</button>
       <button id="neu" title="Neu analysieren (kostet einen API-Aufruf)">↻</button>
       <button id="einst" title="Einstellungen">⚙</button>
       <button id="zu" title="Leiste schließen (Klick aufs Symbol öffnet sie wieder)">✕</button>
@@ -338,22 +287,12 @@
   const leiste = schatten.querySelector(".leiste");
   let zustand = { ergebnis: null, karte: null, laeuft: false, port: null, text: "", spiegel: null, spiegelLaeuft: false };
 
-  function el(tag, attribute, ...kinder) {
-    const e = document.createElement(tag);
-    for (const [k, v] of Object.entries(attribute || {})) {
-      if (k === "class") e.className = v;
-      else if (k === "style") e.style.cssText = v;
-      else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
-      else e.setAttribute(k, v);
-    }
-    for (const k of kinder.flat()) if (k != null && k !== false) e.append(k instanceof Node ? k : String(k));
-    return e;
-  }
   const inhaltSetzen = (...kinder) => $("inhalt").replaceChildren(...kinder);
 
   $("zu").addEventListener("click", () => { leiste.hidden = true; });
   $("einst").addEventListener("click", () => chrome.runtime.sendMessage({ art: "einstellungen_oeffnen" }));
   $("neu").addEventListener("click", () => starten({ neu: true }));
+  $("pdf").addEventListener("click", berichtOeffnen);
   $("an").addEventListener("change", (e) => {
     document.documentElement.classList.toggle("wa-aus", !e.target.checked);
     if (!e.target.checked) $("tip").hidden = true;
@@ -366,6 +305,7 @@
   function starten({ neu = false, ganzeSeite = false } = {}) {
     if (zustand.laeuft) return;
     leiste.hidden = false;
+    $("pdf").disabled = true;
     const text = ganzeSeite ? ganzeSeiteText() : artikelText();
     if (!text) {
       fehlerZeigen("kein_artikel", "Auf dieser Seite wurde kein Artikel erkannt (zu wenig zusammenhängender Text).");
@@ -431,8 +371,7 @@
 
     const abschnitte = [];
     // Gattung
-    const textlage = { unvollstaendig: "Der Text ist unvollständig (z. B. Bezahlschranke).",
-      nur_zusammenfassung: "Es lag nur eine Zusammenfassung vor, kein Wortlaut.", kein_artikel: "Das Modell hat hier keinen Artikel erkannt." }[a.textlage];
+    const textlage = TEXTLAGE[a.textlage];
     abschnitte.push(el("section", {}, el("h2", {}, "Gattung"),
       el("div", { class: "gross" }, a.gattung.art),
       el("div", { class: "klein" }, a.gattung.begruendung),
@@ -441,12 +380,10 @@
       textlage && el("div", { class: "warn" }, textlage)));
 
     // Kennzahl
-    const k = a.kennzahl;
-    const kurz = k.gesamt < MIN_SAETZE_FUER_ANTEIL;
+    const k = kennzahlText(a.kennzahl);
     abschnitte.push(el("section", {}, el("h2", {}, "Kennzahl"),
-      el("div", { class: "gross" }, `${k.markiert} von ${k.gesamt} Sätzen wertend` + (!kurz && k.gesamt ? ` (${Math.round(100 * k.markiert / k.gesamt)} %)` : "")),
-      el("div", { class: "klein" }, (k.strittig ? `plus ${k.strittig} strittige. ` : "")
-        + (kurz ? `Kurzer Text (unter ${MIN_SAETZE_FUER_ANTEIL} Sätzen): nur absolute Zahlen.` : "Gezählt: Überschrift, Vorspann, Zwischenüberschriften, Fließtext."))));
+      el("div", { class: "gross" }, k.gross),
+      el("div", { class: "klein" }, k.klein)));
 
     // Teilwerte
     abschnitte.push(el("section", {}, el("h2", {}, "Teilwerte (0–4)"),
@@ -460,14 +397,12 @@
             el("b", {}, String(tw.wert))),
           el("div", { class: "klein" }, tw.begruendung));
       }),
-      el("div", { class: "klein" }, "0 keine · 1 vereinzelt · 2 wiederkehrend · 3 häufig · 4 durchgehend. Gestrichelt markiert = strittig, gepunktet = nur strukturell.")));
+      el("div", { class: "klein" }, STUFEN + ". Gestrichelt markiert = strittig, gepunktet = nur strukturell.")));
 
     // Richtung
     const r = a.richtung;
-    const richtungText = { parteinahme: "Parteinahme", zuspitzung_ohne_parteinahme: "Zuspitzung ohne Parteinahme",
-      keine_erkennbare_richtung: "Keine erkennbare Richtung" }[r.einordnung];
     abschnitte.push(el("section", {}, el("h2", {}, "Richtung der Wertung"),
-      el("div", { class: "gross" }, richtungText),
+      el("div", { class: "gross" }, RICHTUNG[r.einordnung]),
       r.zugunsten.length > 0 && el("div", {}, "zugunsten: ", el("b", {}, r.zugunsten.join(", "))),
       r.zulasten.length > 0 && el("div", {}, "zulasten: ", el("b", {}, r.zulasten.join(", "))),
       el("div", { class: "klein" }, r.begruendung)));
@@ -526,15 +461,23 @@
     if (a.hinweise.length) abschnitte.push(el("section", {}, el("h2", {}, "Hinweise"), el("ul", {}, a.hinweise.map((h) => el("li", {}, h)))));
 
     // Fuß
-    const m = ergebnis.meta;
-    const datum = new Date(m.zeit).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
     abschnitte.push(el("div", { class: "fuss" },
-      `${m.modell || m.modell_angefragt}, effort ${m.effort}, ${m.dauer_s} s`
-      + (m.kosten_usd_ca != null ? `, ca. ${m.kosten_usd_ca.toFixed(2).replace(".", ",")} $` : "")
-      + (m.modell && m.modell !== m.modell_angefragt ? ` (Ersatzmodell statt ${m.modell_angefragt})` : "")
-      + `. Analysiert am ${datum}.` + (ausSpeicher ? " Aus dem Zwischenspeicher, ohne neuen API-Aufruf." : "")));
+      metaText(ergebnis.meta) + (ausSpeicher ? " Aus dem Zwischenspeicher, ohne neuen API-Aufruf." : "")));
 
     inhaltSetzen(...abschnitte);
+    $("pdf").disabled = false;
+  }
+
+  // ------------------------------------------------------------ Bericht als PDF
+
+  // Übergibt Ergebnis, Spiegelprobe und Artikeltext ans Hintergrundskript; das öffnet die Druckansicht bericht.html.
+  function berichtOeffnen() {
+    if (!zustand.ergebnis) return;
+    chrome.runtime.sendMessage({ art: "bericht_oeffnen", daten: {
+      ergebnis: zustand.ergebnis, spiegel: zustand.spiegel, text: zustand.text,
+      url: location.href, titel: document.title, erstellt: new Date().toISOString(),
+      version: chrome.runtime.getManifest().version,
+    } });
   }
 
   // ------------------------------------------------------------ Spiegelprobe
@@ -587,26 +530,11 @@
       return [titel, el("div", {}, "Nicht spiegelbar: ", g.streitfrage), neu];
     }
     const s = sp.analyse;
-    const abweichend = [];
-    const zeilen = Object.entries(DIM).map(([schl, d]) => {
-      const wo = a.teilwerte[schl].wert, ws = s.teilwerte[schl].wert;
-      if (Math.abs(wo - ws) > 1) abweichend.push(d.name);
-      return el("tr", {}, el("td", {}, el("span", { class: "punkt", style: `background:${d.farbe}` }), " ", d.name),
-        el("td", { class: "zahl" }, String(wo)), el("td", { class: "zahl" }, String(ws)),
-        el("td", {}, Math.abs(wo - ws) > 1 ? el("span", { class: "marke" }, "abweichend") : ""));
-    });
-    // Nur nicht strittige Muster entscheiden; Muster, die nur strittig vorkommen, werden bloß genannt (wie wertung.py)
-    const arten = (x, strittig) => new Set(((x.strategische_muster || {}).muster || [])
-      .filter((m) => !!m.strittig === strittig).map((m) => m.art));
-    const mo = arten(a, false), ms = arten(s, false);
-    const so = [...arten(a, true)].filter((x) => !mo.has(x)), ss = [...arten(s, true)].filter((x) => !ms.has(x));
-    const musterGleich = mo.size === ms.size && [...mo].every((x) => ms.has(x));
-    if (!musterGleich) abweichend.push("Muster");
-    if (a.kennzeichnungsproblem.vorhanden !== s.kennzeichnungsproblem.vorhanden) abweichend.push("Kennzeichnung");
-    if (a.richtung.einordnung !== s.richtung.einordnung) abweichend.push("Richtung");
-    const namen = (menge) => [...menge].map((x) => MUSTER[x] || x).join(", ") || "keine";
-    const richtung = (r) => ({ parteinahme: "Parteinahme", zuspitzung_ohne_parteinahme: "Zuspitzung", keine_erkennbare_richtung: "keine Richtung" }[r.einordnung])
-      + (r.zugunsten.length ? ` zugunsten ${r.zugunsten.join(", ")}` : "");
+    const { abweichend, teilwerte, mo, ms, so, ss, musterGleich, namen, richtung } = spiegelVergleich(a, s);
+    const zeilen = teilwerte.map((t) => el("tr", {},
+      el("td", {}, el("span", { class: "punkt", style: `background:${t.farbe}` }), " ", t.name),
+      el("td", { class: "zahl" }, String(t.original)), el("td", { class: "zahl" }, String(t.gegen)),
+      el("td", {}, t.abweichend ? el("span", { class: "marke" }, "abweichend") : "")));
     const seite = { seite_a: g.seite_a, seite_b: g.seite_b }[g.original_beguenstigt];
     return [titel,
       el("div", { class: "klein" }, "Streitfrage: ", g.streitfrage),
@@ -625,7 +553,7 @@
         `Nicht gespiegelt (${g.nicht_gespiegelt.length}): `, g.nicht_gespiegelt.join(" · ")),
       el("details", {},
         el("summary", {}, "Gegenfassung lesen"),
-        el("div", { class: "warn" }, "Konstruierter Prüftext mit vertauschten Seiten, kein echter Artikel. Nicht weitergeben."),
+        el("div", { class: "warn" }, "Konstruierter Prüftext mit vertauschten Seiten, kein echter Artikel."),
         g.tausch.length > 0 && el("ul", {}, g.tausch.map((t) => el("li", { class: "klein" }, `„${t.original}“ → „${t.spiegel}“`))),
         el("div", { class: "gegentext" }, g.text)),
       el("div", { class: "klein" }, "Ein einzelner Lauf schwankt; erst wiederholte Abweichungen sind aussagekräftig."),
@@ -640,18 +568,7 @@
         el("div", { class: "klein" }, "Dieses Ergebnis stammt aus einer älteren Version ohne Stimmenverzeichnis. ↻ analysiert neu (kostet)."));
     }
     const liste = st.liste;
-    const summe = liste.reduce((n, s) => n + s.aussagen, 0);
-    // Positionen in der Reihenfolge ihres ersten Auftretens, gleicher Wortlaut = gleiche Position
-    const positionen = new Map();
-    for (const s of liste) {
-      const schl = s.position.trim().toLowerCase();
-      const p = positionen.get(schl) || { name: s.position.trim(), stimmen: 0, aussagen: 0 };
-      p.stimmen += 1; p.aussagen += s.aussagen;
-      positionen.set(schl, p);
-    }
-    const mitHaltung = [...positionen.keys()].some((k) => k !== "ohne position");
-    const typen = new Map();
-    for (const s of liste) typen.set(s.typ, (typen.get(s.typ) || 0) + s.aussagen);
+    const { summe, positionen, mitHaltung, herkunft } = stimmenZaehlen(liste);
     const index = liste.length ? seitenIndex() : null;
 
     return el("section", {}, el("h2", {}, titel),
@@ -659,13 +576,12 @@
         ? el("div", {}, "Der Text schreibt niemandem eine Aussage zu.")
         : el("div", { class: "gross" }, `${liste.length} ${liste.length === 1 ? "Stimme" : "Stimmen"}, ${summe} ${summe === 1 ? "Aussage" : "Aussagen"}`),
       mitHaltung && el("h3", {}, "Aussagen nach Position"),
-      mitHaltung && [...positionen.values()].map((p) => el("div", { class: "pos" },
+      mitHaltung && positionen.map((p) => el("div", { class: "pos" },
         el("div", { class: "pos-kopf" }, el("span", {}, p.name),
           el("span", { class: "klein" }, `${p.aussagen} (${p.stimmen} ${p.stimmen === 1 ? "Stimme" : "Stimmen"})`)),
         el("div", { class: "pos-balken", style: `width:${summe ? Math.max(2, Math.round(100 * p.aussagen / summe)) : 0}%` }))),
       liste.length > 0 && el("h3", {}, "Aussagen nach Herkunft"),
-      liste.length > 0 && el("div", { class: "klein" },
-        [...typen.entries()].sort((x, y) => y[1] - x[1]).map(([t, n]) => `${STIMMEN_TYP[t] || t} ${n}`).join(" · ")),
+      liste.length > 0 && el("div", { class: "klein" }, herkunft),
       liste.length > 0 && el("h3", {}, "Stimmen"),
       liste.length > 0 && el("ul", {}, liste.map((s) => {
         const da = !!stelleFinden(index, s.erstes_vorkommen);

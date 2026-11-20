@@ -13,6 +13,8 @@ Richtung, Kennzahl, neutrale Fassung) mit der Anthropic-API. Nicht zur Veröffen
 | `wertung.py` | Kommandozeile: analysiert `testartikel/`, speichert `ergebnisse/<artikel>/laufN.json`, vergleicht zwei Läufe, schreibt `ergebnisse/uebersicht.md` |
 | `addon/manifest.json` | Chrome-Addon, Manifest V3, Rechte: `activeTab`, `scripting`, `storage`, Zugriff nur auf `api.anthropic.com` |
 | `addon/hintergrund.js` | Service Worker: Klick aufs Symbol → Skripte in den Tab; API-Aufruf (Streaming, strukturierte Ausgabe); Zwischenspeicher je Adresse |
+| `addon/gemeinsam.js` | Bezeichnungen, Textvereinheitlichung und Spiegelvergleich, gemeinsam für Seitenleiste und Bericht |
+| `addon/bericht.html` · `.js` · `.css` | Druckansicht des Ergebnisses zum Speichern als PDF |
 | `addon/inhalt.js` · `addon/markierung.css` | Artikeltext mit Readability, Fundstellen im Seitentext suchen und markieren, Seitenleiste (Shadow DOM), Hinweis beim Überfahren |
 | `addon/einstellungen.html` · `.js` | Schlüssel, Modell, effort, Zwischenspeicher leeren |
 | `addon/lib/` | Mozilla Readability 0.6.0 (Apache-2.0), Herkunft in `HERKUNFT.md` |
@@ -155,8 +157,8 @@ der Gegenfassung.
 
 Je Artikel entstehen `spiegel.json` (Gegenfassung mit Streitfrage, Seiten, wichtigsten Ersetzungen),
 `spiegel_text.txt` (zum Lesen) und `spiegel_lauf1.json` (ihre Analyse); `uebersicht.md` bekommt den Abschnitt
-„Spiegelprobe“. Die Gegenfassung ist ein konstruierter Prüftext über echte Personen und Medien: nur zur Messung,
-nicht weitergeben. Sie liegt wie alle Ergebnisse in `ergebnisse/` und damit außerhalb des Repositorys.
+„Spiegelprobe“. Die Gegenfassung ist ein konstruierter Prüftext über echte Personen und Medien und ist überall
+als solcher gekennzeichnet. Sie liegt wie alle Ergebnisse in `ergebnisse/` und damit außerhalb des Repositorys.
 
 ## Addon
 
@@ -188,6 +190,13 @@ Nach Änderungen am Code auf `chrome://extensions` beim Addon auf ↻ klicken un
   begünstigt, Teilwerte Original gegen Gegenfassung, Muster und Richtung beider Fassungen, Urteil „symmetrisch“ oder
   „ungleich bewertet“, nicht gespiegelte Stellen und aufklappbar die Gegenfassung mit den wichtigsten Ersetzungen.
   Das Ergebnis wird je Adresse gemerkt („Zwischenspeicher leeren“ löscht es mit).
+- **PDF** in der Kopfzeile der Leiste öffnet neben dem Artikel eine Druckansicht: Überblick (Gattung, Kennzahl,
+  Richtung, Kennzeichnung), Teilwerte, Muster, Stimmen, Spiegelprobe (falls gemacht), der Artikeltext mit farbigen,
+  nummerierten Markierungen, alle Fundstellen mit Begründung, Wirkung, Wortleiter und neutraler Alternative, die
+  neutrale Fassung und die Hinweise. „Als PDF speichern …“ öffnet den Chrome-Druck; dort Ziel „Als PDF speichern“
+  wählen und Kopf- und Fußzeilen ausschalten (Seitenzahlen setzt der Bericht selbst). Artikeltext und neutrale
+  Fassung lassen sich vorher abwählen, ebenso die Gegenfassung der Spiegelprobe (mit wichtigsten Ersetzungen,
+  als konstruierter Prüftext gekennzeichnet). Die letzten fünf Berichte bleiben gemerkt, „Zwischenspeicher leeren“ löscht sie mit.
 - Fehlermeldungen in der Leiste: kein Artikel erkannt (Knopf „Ganze Seite analysieren“), Schlüssel fehlt/ungültig,
   Guthaben leer, Modell unbekannt, Ratenlimit, API gestört; nicht gefundene Fundstellen stehen mit ⚠ in der Liste.
 - Der Schlüssel liegt nur in `chrome.storage.local` dieses Browserprofils und geht nur an `api.anthropic.com`.
