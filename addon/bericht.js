@@ -2,10 +2,9 @@
 // Die Daten legt hintergrund.js unter "bericht:<id>" ab; die id steht in der Adresse.
 (() => {
   const { DIM, MUSTER, STIMMEN_TYP, VERMERK, RICHTUNG, TEXTLAGE, GATTUNG_KOMMENTAR, STUFEN,
-    zeichen, normalisieren, kennzahlText, spiegelVergleich, stimmenZaehlen, metaText, el } = globalThis.WA_GEMEINSAM;
+    kennzahlText, spiegelVergleich, stimmenZaehlen, metaText, el, zeilenLesen, textIndex, bereicheFinden,
+    artikelDarstellen, fundDarstellen, redezeit } = globalThis.WA_GEMEINSAM;
   const $ = (id) => document.getElementById(id);
-  const MARKE = /^\[(Bildunterschrift|Kasten|Teaser|Unterzeile|Vorspann|Zwischenüberschrift|Autor|Ressort)\]\s*/;
-  const NEBENTEXT = new Set(["Bildunterschrift", "Kasten", "Teaser", "Autor", "Ressort"]);
 
   $("drucken").addEventListener("click", () => window.print());
   $("mitArtikel").addEventListener("change", (e) => $("teilArtikel")?.classList.toggle("ausgeblendet", !e.target.checked));
@@ -24,118 +23,10 @@
     berichtZeigen(daten);
   });
 
-  // ------------------------------------------------------------ Artikeltext zerlegen und Fundstellen suchen
-
-  // Zeilen des an die Analyse geschickten Texts: URL-Zeile weg, erste Zeile ohne Marke = Überschrift
-  function zeilenLesen(text) {
-    const roh = (text || "").normalize("NFC").split("\n").map((z) => z.trim()).filter(Boolean);
-    if (roh.length && /^URL:/.test(roh[0])) roh.shift();
-    let ueberschrift = false;
-    return roh.map((z) => {
-      const m = z.match(MARKE);
-      if (m) return { art: m[1], text: z.slice(m[0].length) };
-      if (ueberschrift) return { art: "", text: z };
-      ueberschrift = true;
-      return { art: "Überschrift", text: z };
-    });
-  }
-
-  // Vergleichsform aller Zeilen mit Zuordnung jedes Zeichens zu Zeile und Stelle (wie seitenIndex in inhalt.js)
-  function textIndex(zeilen) {
-    let text = "";
-    const zeile = [], off = [];
-    zeilen.forEach((z, zi) => {
-      if (text && !text.endsWith(" ")) { text += " "; zeile.push(-1); off.push(-1); }
-      for (let i = 0; i < z.text.length; i++) {
-        const c = zeichen(z.text[i]);
-        if (c === "") continue;
-        if (c === " " && (text === "" || text.endsWith(" "))) continue;
-        text += c; zeile.push(zi); off.push(i);
-      }
-    });
-    return { text, zeile, off };
-  }
-
-  // Bereiche im Text: überlappende Fundstellen werden zu einem Bereich mit mehreren Befunden
-  function bereicheFinden(index, markierungen) {
-    const bereiche = [];
-    const start = markierungen.map((m, i) => {
-      const z = normalisieren(m.zitat).trim();
-      const pos = z ? index.text.indexOf(z) : -1;
-      if (pos < 0) return -1;
-      const ende = pos + z.length - 1;
-      const b = bereiche.find((x) => pos <= x.ende && x.start <= ende);
-      if (b) { b.start = Math.min(b.start, pos); b.ende = Math.max(b.ende, ende); b.befunde.push(i); }
-      else bereiche.push({ start: pos, ende, befunde: [i] });
-      return pos;
-    });
-    // Nummern in Lesereihenfolge; nicht gefundene Stellen ans Ende
-    const reihe = markierungen.map((m, i) => i)
-      .sort((x, y) => (start[x] < 0) - (start[y] < 0) || start[x] - start[y] || x - y);
-    const nummer = [];
-    reihe.forEach((i, n) => { nummer[i] = n + 1; });
-    for (const b of bereiche) b.befunde.sort((x, y) => nummer[x] - nummer[y]);
-    return { bereiche, nummer, reihe, gefunden: start.map((s) => s >= 0) };
-  }
-
-  function artikelDarstellen(zeilen, index, karte, markierungen) {
-    // Stücke je Zeile: [von, bis) in der Zeile, zu welchem Bereich, ob letztes Stück des Bereichs
-    const stuecke = zeilen.map(() => []);
-    karte.bereiche.forEach((b, bi) => {
-      const teile = [];
-      for (let p = b.start; p <= b.ende; p++) {
-        const zi = index.zeile[p];
-        if (zi < 0) continue;
-        const letztes = teile[teile.length - 1];
-        if (letztes && letztes.zi === zi) letztes.bis = index.off[p] + 1;
-        else teile.push({ zi, von: index.off[p], bis: index.off[p] + 1, bi });
-      }
-      if (teile.length) teile[teile.length - 1].letztes = true;
-      for (const t of teile) stuecke[t.zi].push(t);
-    });
-
-    return zeilen.map((z, zi) => {
-      const kinder = [];
-      let pos = 0;
-      for (const s of stuecke[zi].sort((x, y) => x.von - y.von)) {
-        if (s.von < pos) continue;
-        kinder.push(z.text.slice(pos, s.von));
-        const b = karte.bereiche[s.bi];
-        const erste = markierungen[b.befunde[0]];
-        const klasse = `wa d-${erste.dimension}` + (erste.strittig ? " strittig" : "") + (erste.nur_struktur ? " struktur" : "");
-        kinder.push(el("span", { class: klasse }, z.text.slice(s.von, s.bis)));
-        if (s.letztes) kinder.push(el("sup", { class: `nr d-${erste.dimension}` }, b.befunde.map((i) => karte.nummer[i]).join(",")));
-        pos = s.bis;
-      }
-      kinder.push(z.text.slice(pos));
-      if (z.art === "Überschrift") return el("div", { class: "ueberschrift" }, kinder);
-      if (z.art === "Zwischenüberschrift") return el("p", { class: "zwischen" }, kinder);
-      const klasse = z.art === "Vorspann" || z.art === "Unterzeile" ? "vorspann" : NEBENTEXT.has(z.art) ? "nebentext" : "";
-      return el("p", { class: klasse }, z.art && el("span", { class: "markenname" }, z.art), kinder);
-    });
-  }
-
   // ------------------------------------------------------------ Bausteine
 
   const balken = (wert, farbe) => el("span", { class: "balken" },
     [1, 2, 3, 4].map((s) => el("i", { style: s <= wert ? `background:${farbe}` : "" })));
-
-  function wortleiter(wl) {
-    const n = wl && Array.isArray(wl.stufen) ? wl.stufen.length : 0;
-    if (n < 2 || !(wl.gewaehlt >= 0 && wl.gewaehlt < n)) return null;
-    return el("div", { class: "leiter" },
-      el("span", { class: "pol" }, "−"),
-      wl.stufen.map((s, i) => el("span", {
-        class: "stufe" + (i === wl.gewaehlt ? " gewaehlt" : "") + (i === wl.neutral ? " neutral" : ""),
-      }, s)),
-      el("span", { class: "pol" }, "+"));
-  }
-
-  function etiketten(m) {
-    return [m.strittig && el("span", { class: "etikett" }, "strittig"),
-      m.nur_struktur && el("span", { class: "etikett" }, "strukturell"),
-      m.ausserhalb_zaehlbasis && el("span", { class: "etikett" }, "außerhalb Zählbasis")];
-  }
 
   // ------------------------------------------------------------ Bericht
 
@@ -146,6 +37,8 @@
     document.title = `Wertungsanalyse – ${titel}`;
     const index = textIndex(zeilen);
     const karte = bereicheFinden(index, a.markierungen);
+    const tv = daten.ergebnis.tv || null;
+    const rz = redezeit(a.stimmen, tv);
     const teile = [];
 
     // Kopf
@@ -153,6 +46,8 @@
       el("div", { class: "marke-oben" }, "Wertungsanalyse"),
       el("h1", {}, titel),
       el("div", { class: "url" }, daten.url),
+      tv && el("div", { class: "meta" }, `Fernsehbeitrag, ${minuten(tv.absaetze.length ? tv.absaetze[tv.absaetze.length - 1].ende : 0)} min. Text aus den `
+        + (tv.live ? "Live-Untertiteln" : "Untertiteln") + "; Bilder, Einblendungen und Tonfall sind nicht berücksichtigt."),
       el("div", { class: "meta" }, metaText(daten.ergebnis.meta))));
 
     // Überblick
@@ -201,7 +96,7 @@
     }
 
     // Wer kommt zu Wort
-    if (a.stimmen) teile.push(...stimmenTeil(a.stimmen));
+    if (a.stimmen) teile.push(...stimmenTeil(a.stimmen, rz));
 
     // Spiegelprobe mit Gegenfassung (abwählbar)
     if (daten.spiegel) teile.push(...spiegelTeil(a, daten.spiegel));
@@ -210,11 +105,11 @@
     const fehlend = karte.gefunden.filter((x) => !x).length;
     teile.push(el("section", { id: "teilArtikel" },
       el("div", { class: "gruppe" },
-        el("h2", {}, "Artikel mit Markierungen"),
+        el("h2", {}, tv ? "Transkript mit Markierungen" : "Artikel mit Markierungen"),
         el("div", { class: "legende" }, Object.entries(DIM).map(([schl, d]) =>
           el("span", {}, el("span", { class: `wa d-${schl}` }, d.name))),
           el("span", {}, "gestrichelt = strittig · gepunktet = nur strukturell · Ziffer = Nummer der Fundstelle"))),
-      el("div", { class: "artikel" }, artikelDarstellen(zeilen, index, karte, a.markierungen))));
+      el("div", { class: "artikel" }, artikelDarstellen(zeilen, index, karte, a.markierungen, (z) => absatzEtikett(z, rz)))));
 
     // Fundstellen
     teile.push(el("section", {}, el("h2", {}, `Fundstellen (${a.markierungen.length})`),
@@ -223,19 +118,7 @@
       fehlend > 0 && el("div", { class: "warn" }, `${fehlend} von ${a.markierungen.length} Fundstellen stehen nicht wörtlich im `
         + "analysierten Text und sind oben nicht markiert (mit ⚠)."),
       a.markierungen.length === 0 && el("p", {}, "Keine wertenden Stellen markiert."),
-      karte.reihe.map((i) => {
-        const m = a.markierungen[i];
-        const d = DIM[m.dimension];
-        return el("div", { class: `fund d-${m.dimension}` },
-          el("div", { class: "nr-kreis" }, String(karte.nummer[i])),
-          el("div", {},
-            el("div", { class: "dim" }, d.name, etiketten(m)),
-            el("div", { class: "zitat" }, karte.gefunden[i] ? "" : "⚠ ", `„${m.zitat}“`),
-            el("div", { class: "begr" }, m.begruendung),
-            m.wirkung && el("div", { class: "wirk" }, el("b", {}, "Wirkung: "), m.wirkung),
-            wortleiter(m.wortleiter),
-            m.alternative && el("div", { class: "alt" }, el("b", {}, "Neutral: "), m.alternative)));
-      })));
+      karte.reihe.map((i) => fundDarstellen(a.markierungen[i], karte.nummer[i], karte.gefunden[i]))));
 
     // Neutrale Fassung
     teile.push(el("section", { id: "teilNeutral" }, el("h2", {}, "Neutrale Fassung"),
@@ -254,9 +137,33 @@
     $("bericht").replaceChildren(...teile.flat().filter(Boolean));
   }
 
-  function stimmenTeil(st) {
+  const minuten = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+
+  // Absatz eines Transkripts: O-Ton mit Sprecher (aus der Analyse) oder Sprechertext
+  function absatzEtikett(z, rz) {
+    const sprecher = rz && rz.absatzStimme.get(z.nr);
+    if (!sprecher) return { text: `${z.nr} · Sprechertext`, oton: false };
+    return { text: `${z.nr} · ${/O-Ton/i.test(sprecher) ? sprecher : "O-Ton " + sprecher}`, oton: true };
+  }
+
+  // Redezeit im O-Ton nach Position und Anteil des Sprechertexts (nur Fernsehbeiträge)
+  function redezeitTeil(rz) {
+    if (!rz || !rz.gesamt) return [];
+    const max = Math.max(1, ...rz.positionen.map((p) => p.sekunden));
+    return [el("h3", {}, "Redezeit im O-Ton nach Position"),
+      rz.positionen.length === 0 && el("p", { class: "klein" }, "Die Analyse hat keinem Absatz einen O-Ton zugeordnet."),
+      ...rz.positionen.map((p) => el("div", { class: "pos" },
+        el("div", { class: "pos-kopf" }, el("span", {}, p.name),
+          el("span", { class: "klein" }, `${p.sekunden} s (${p.stimmen} ${p.stimmen === 1 ? "Stimme" : "Stimmen"})`)),
+        el("div", { class: "pos-balken", style: `width:${Math.max(2, Math.round(100 * p.sekunden / max))}%` }))),
+      el("p", { class: "klein" }, `O-Töne zusammen ${rz.oton} s, Sprechertext und Moderation ${rz.sprechertext} s, `
+        + `Beitrag ${rz.gesamt} s. Gemessen an den Zeiten der Untertitel; welcher Absatz welcher Stimme gehört, hat die Analyse bestimmt.`)];
+  }
+
+  function stimmenTeil(st, rz) {
     const liste = st.liste;
     const { summe, positionen, mitHaltung, herkunft } = stimmenZaehlen(liste);
+    const sekunden = new Map(rz ? rz.jeStimme.map((s) => [s.sprecher, s.sekunden]) : []);
     return [el("h2", {}, "Wer kommt zu Wort"),
       el("p", { class: "gross" }, liste.length === 0 ? "Der Text schreibt niemandem eine Aussage zu."
         : `${liste.length} ${liste.length === 1 ? "Stimme" : "Stimmen"}, ${summe} ${summe === 1 ? "Aussage" : "Aussagen"}`),
@@ -265,11 +172,13 @@
         el("div", { class: "pos-kopf" }, el("span", {}, p.name),
           el("span", { class: "klein" }, `${p.aussagen} (${p.stimmen} ${p.stimmen === 1 ? "Stimme" : "Stimmen"})`)),
         el("div", { class: "pos-balken", style: `width:${summe ? Math.max(2, Math.round(100 * p.aussagen / summe)) : 0}%` }))),
+      ...redezeitTeil(rz),
       liste.length > 0 && el("h3", {}, "Aussagen nach Herkunft"),
       liste.length > 0 && el("p", { class: "klein" }, herkunft),
       liste.length > 0 && el("h3", {}, "Stimmen"),
       liste.length > 0 && el("ul", { class: "liste spalten" }, liste.map((s) => el("li", {},
-        el("b", {}, s.sprecher), ` · ${s.aussagen}×`, s.anonym && el("span", { class: "etikett" }, "anonym"),
+        el("b", {}, s.sprecher), ` · ${s.aussagen}×`, sekunden.get(s.sprecher) ? ` · ${sekunden.get(s.sprecher)} s O-Ton` : "",
+        s.anonym && el("span", { class: "etikett" }, "anonym"),
         el("div", { class: "klein" }, STIMMEN_TYP[s.typ] || s.typ, mitHaltung ? ` · ${s.position}` : "")))),
       st.ohne_stimme.length > 0 && el("h3", {}, "Genannt, aber ohne eigene Aussage"),
       st.ohne_stimme.length > 0 && el("ul", { class: "liste" }, st.ohne_stimme.map((o) => el("li", {},

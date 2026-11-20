@@ -16,6 +16,17 @@ Prüfe zuerst die Textlage:
 - `nur_zusammenfassung`: Es liegt nicht der Wortlaut vor, sondern eine Zusammenfassung oder Inhaltsangabe. Dann Wortwahl und epistemische Rahmung nicht bewerten (Teilwert 0, Begründung „nicht bewertbar, kein Wortlaut“), keine Markierungen dieser Dimensionen, Kennzahl mit 0 markierten Sätzen und dazu ein Hinweis.
 - `kein_artikel`: Der Text ist kein Artikel (Startseite, Liste von Anrissen, Fehlerseite, Navigation, Werbung). Dann keine Markierungen, alle Teilwerte 0, Kennzahl 0/0/0, und in den Hinweisen kurz, was stattdessen vorliegt.
 
+### Fernsehbeiträge
+
+Sagt die Zeile `Quelle:`, dass der Text aus den Untertiteln einer Fernsehsendung stammt, oder beginnen die Absätze mit `[Absatz 1]`, `[Absatz 2]` …, dann ist er ein Transkript. Es gilt alles Übrige, dazu:
+- Jeder Absatz ist ein Sprecherwechsel. Die Marke `[Absatz N]` ist kein Wortlaut und steht nie in einem Zitat.
+- Die erste Zeile nach `Quelle:` ist der Titel des Videos und gilt als Überschrift. Der erste Absatz ist meist die Anmoderation aus dem Studio; sie gilt als Vorspann (Zählbasis, Dimension `ueberschrift`, wenn sie vom Kern des Beitrags abweicht oder zuspitzt).
+- Moderation, Sprechertext des Beitrags und Korrespondenten im Schaltgespräch sind die **Stimme des Beitrags**, wie der Fließtext eines Artikels. Ihre Wortwahl und Rahmung bewertest du wie Artikeltext. Sie sind keine Stimmen im Sinne von Schritt 6.
+- **O-Töne** sind Absätze, in denen eine andere Person spricht (Politikerin, Betroffener, Gewerkschafter). Du erkennst sie am Inhalt (erste Person, Anrede, Umgangssprache) und am Zusammenhang. Sie sind wörtliche Zitate: Ihre Wertungen gehören den Sprechenden, nicht dem Beitrag. Namen werden im Fernsehen meist nur eingeblendet und fehlen im Transkript. Erschließe die Person aus dem Sprechertext davor oder danach („sagt die Ministerin“), sonst bezeichne sie nach ihrer Rolle („ein Streikender“).
+- Bilder, Grafiken, Einblendungen, Musik und Tonfall fehlen. Spekuliere nicht, was zu sehen war. Was nur Bilder klären könnten, ist kein Befund.
+- Untertitel, besonders live erstellte, können gekürzt, vereinfacht oder fehlerhaft sein (Hörfehler, falsche Homophone wie „war“ statt „wahr“). Offensichtliche Übertragungsfehler bewertest du nicht; zitiert wird trotzdem zeichengenau. Sage in den Hinweisen einmal, dass die Wortwahl der Untertitel nicht sicher die der Sendung ist.
+- Gattung: Ein Beitrag mit Sprechertext und O-Tönen ist ein `Bericht` (mit Szenen und Atmosphäre eine `Reportage`), ein Schaltgespräch mit einer Korrespondentin `Analyse/Erklärstück`, ein gekennzeichneter Kommentar („Die Meinung“) `Kommentar/Meinung`. Enthält der Text eine ganze Sendung mit mehreren unabhängigen Themen, ist die Gattung `sonstige`; die Richtung bestimmst du dann nur, wenn ein Thema überwiegt, sonst `keine_erkennbare_richtung` mit dem Hinweis, dass die Befunde je Beitrag gelten.
+
 ## Schritt 1: Gattung
 
 Bestimme die Gattung: Agenturmeldung, Bericht, Analyse/Erklärstück, Reportage, Interview, Kommentar/Meinung, Glosse, Chronik/Liste, Lagebericht (mit Karte oder Daten), Pressemitteilung, Behördenkommunikation, sonstige.
@@ -123,9 +134,9 @@ Im Zweifel kein Muster. Jedes Muster braucht mindestens einen Beleg.
 
 Du legst ein Verzeichnis der Stimmen an: wer im Text etwas sagen darf, wie oft und für welche Position. Das ist eine Bestandsaufnahme, keine Bewertung. Das Verzeichnis zählt weder in den Teilwerten noch in der Kennzahl. Ergibt sich daraus eine einseitige Auswahl, markierst du sie wie bisher unter `quellen` oder `auswahl` (dort mit `nur_struktur`).
 
-**Wer eine Stimme ist:** jede Person, Gruppe oder Institution, der der Text eine Aussage zuschreibt, ob wörtlich zitiert, in indirekter Rede oder mit „laut“, „nach Angaben von“, „wie X mitteilte“. Auch Studien, Statistiken und Dokumente zählen; Sprecher ist dann die herausgebende Stelle („Statistisches Bundesamt“, „Institut für …“). Keine Stimmen sind die Stimme des Artikels selbst, die Autorin oder der Autor und Nachrichtenagenturen als Herkunftsangabe („dpa“ am Anfang). Im Interview ist die befragte Person eine Stimme, die Fragen der Redaktion sind es nicht.
+**Wer eine Stimme ist:** jede Person, Gruppe oder Institution, der der Text eine Aussage zuschreibt, ob wörtlich zitiert, in indirekter Rede oder mit „laut“, „nach Angaben von“, „wie X mitteilte“. Auch Studien, Statistiken und Dokumente zählen; Sprecher ist dann die herausgebende Stelle („Statistisches Bundesamt“, „Institut für …“). Keine Stimmen sind die Stimme des Artikels selbst, die Autorin oder der Autor und Nachrichtenagenturen als Herkunftsangabe („dpa“ am Anfang). Im Interview ist die befragte Person eine Stimme, die Fragen der Redaktion sind es nicht. Im Fernsehbeitrag ist jede Person mit O-Ton eine Stimme, Moderation und Sprechertext sind es nicht.
 
-**Zusammenfassen:** Eine Person oder Institution ist ein Eintrag, auch wenn sie mehrfach spricht. Pressesprecher und Institution sind ein Eintrag („Innenministerium“, nicht „Sprecher des Innenministeriums“). Bei mehr als 15 Stimmen fasse Einzelpersonen gleichen Typs und gleicher Position zusammen („drei Anwohner“).
+**Zusammenfassen:** Eine Person oder Institution ist ein Eintrag, auch wenn sie mehrfach spricht. Pressesprecher und Institution sind ein Eintrag („Innenministerium“, nicht „Sprecher des Innenministeriums“). Bei mehr als 15 Stimmen fasse Einzelpersonen gleichen Typs und gleicher Position zusammen („drei Anwohner“). Spricht im Fernsehbeitrag eine Person im O-Ton für eine Institution, die der Sprechertext auch indirekt zitiert, ist das ein Eintrag („IG Metall (O-Ton eines Gewerkschafters)“), nicht zwei.
 
 Felder je Stimme (`liste`, in der Reihenfolge des ersten Auftretens):
 - `sprecher`: Name oder Bezeichnung wie im Text, mit Funktion, wenn der Text sie nennt („Innenministerin Müller“, „ein Anwohner“).
@@ -134,6 +145,7 @@ Felder je Stimme (`liste`, in der Reihenfolge des ersten Auftretens):
 - `aussagen`: Anzahl der Sätze der Zählbasis, in denen dieser Stimme eine Aussage zugeschrieben wird (mindestens 1).
 - `position`: die Haltung der Stimme zur zentralen Streitfrage des Textes, kurz und neutral in eigenen Worten („für die Kürzung“, „gegen die Kürzung“). Verwende für dieselbe Haltung bei allen Stimmen denselben Wortlaut, damit sie sich zusammenfassen lassen. Stimmen, die nur Sachverhalte mitteilen oder keine Haltung erkennen lassen, und Texte ohne Streitfrage: `ohne Position`. Keine Links-rechts-Einordnung.
 - `erstes_vorkommen`: Zitat nach den Zitatregeln aus dem Satz, in dem die Stimme zum ersten Mal mit einer Aussage vorkommt, möglichst mit ihrer Bezeichnung („sagte Innenministerin Müller am Dienstag“).
+- `absaetze`: nur bei Texten mit Absatzmarken `[Absatz N]`: die Nummern N der Absätze, in denen diese Stimme selbst im O-Ton spricht, aufsteigend. Absätze, in denen der Sprechertext sie nur wiedergibt, gehören nicht dazu; ein Absatz gehört höchstens einer Stimme. Aus den Nummern und den Zeiten der Untertitel errechnet die Anzeige die Redezeit. Ohne Absatzmarken (Artikel) bleibt die Liste leer.
 
 **Ohne Stimme** (`ohne_stimme`): Akteure, die der Text selbst als beschuldigt, kritisiert, unmittelbar betroffen oder als Entscheidungsträger der Streitfrage nennt, die aber keine eigene Aussage im Text haben. Höchstens fünf, die wichtigsten zuerst. Nenne nur Akteure, die im Text vorkommen; Gruppen, die der Text gar nicht erwähnt, gehören nicht hierher (keine externen Maßstäbe, was „fehlen“ müsste). Felder:
 - `akteur`: Bezeichnung wie im Text.

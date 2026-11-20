@@ -130,6 +130,12 @@ def pruefen(analyse: dict, artikeltext: str) -> dict:
             stimmen_nicht_gefunden.append(b)
         if len(b.split()) > 10:
             stimmen_zu_lang.append(b)
+    # Fernsehtranskripte: O-Ton-Absätze müssen als [Absatz N] im Text stehen und gehören höchstens einer Stimme
+    vorhanden = {int(n) for n in re.findall(r"^\s*\[Absatz (\d+)\]", artikeltext, flags=re.M)}
+    vergeben: dict[int, int] = {}
+    for x in st["liste"]:
+        for n in x.get("absaetze") or []:
+            vergeben[n] = vergeben.get(n, 0) + 1
     return {
         "markierungen": len(analyse["markierungen"]),
         "zitate_nicht_gefunden": nicht_gefunden,
@@ -153,6 +159,8 @@ def pruefen(analyse: dict, artikeltext: str) -> dict:
         "stimmen_ohne_aussage": [x["sprecher"] for x in st["liste"] if x["aussagen"] < 1],
         "stimmen_aussagen_ueber_gesamt": sum(x["aussagen"] for x in st["liste"]) > k["gesamt"] > 0,
         "ohne_stimme_zu_viele": len(st["ohne_stimme"]) > MAX_OHNE_STIMME,
+        "stimmen_absatz_unbekannt": sorted(n for n in vergeben if n not in vorhanden),
+        "stimmen_absatz_doppelt": sorted(n for n, k in vergeben.items() if k > 1),
     }
 
 

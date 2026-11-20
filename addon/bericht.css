@@ -81,6 +81,8 @@ sup.nr { font: bold 6.5pt "Segoe UI", system-ui, sans-serif; color: rgb(var(--wa
 .d-quellen { --wa: 28, 126, 214; }
 .d-auswahl { --wa: 47, 158, 68; }
 .d-ueberschrift { --wa: 224, 49, 49; }
+.artikel p.absatz { margin-bottom: 7px; }
+.artikel p.oton { padding-left: 8px; border-left: 2px solid #bbb; }
 .legende { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 8pt; color: #555; margin: 4px 0 8px; }
 
 /* Fundstellen */

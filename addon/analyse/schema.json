@@ -112,14 +112,15 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["sprecher", "typ", "anonym", "aussagen", "position", "erstes_vorkommen"],
+            "required": ["sprecher", "typ", "anonym", "aussagen", "position", "erstes_vorkommen", "absaetze"],
             "properties": {
               "sprecher": {"type": "string"},
               "typ": {"type": "string", "enum": ["regierung_verwaltung", "partei_parlament", "justiz", "sicherheit", "wirtschaft", "verband", "zivilgesellschaft", "wissenschaft", "internationale_organisation", "medien", "betroffene", "sonstige"]},
               "anonym": {"type": "boolean"},
               "aussagen": {"type": "integer"},
               "position": {"type": "string", "description": "Haltung zur Streitfrage, gleicher Wortlaut für gleiche Haltung, sonst 'ohne Position'"},
-              "erstes_vorkommen": {"type": "string", "description": "zeichengenau aus dem Artikel, höchstens zehn Wörter"}
+              "erstes_vorkommen": {"type": "string", "description": "zeichengenau aus dem Artikel, höchstens zehn Wörter"},
+              "absaetze": {"type": "array", "items": {"type": "integer"}, "description": "Nummern der Absätze [Absatz N] mit O-Ton dieser Stimme, sonst leer"}
             }
           }
         },

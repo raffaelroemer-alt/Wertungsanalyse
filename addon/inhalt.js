@@ -5,7 +5,9 @@
   const WA = (window.__wertungsanalyse = {});
 
   const { DIM, MUSTER, STIMMEN_TYP, VERMERK, RICHTUNG, TEXTLAGE, GATTUNG_KOMMENTAR, STUFEN,
-    zeichen, normalisieren, kennzahlText, spiegelVergleich, stimmenZaehlen, metaText, el } = globalThis.WA_GEMEINSAM;
+    zeichen, normalisieren, kennzahlText, spiegelVergleich, stimmenZaehlen, metaText, el,
+    zeilenLesen, textIndex, bereicheFinden, artikelDarstellen, fundDarstellen,
+    tagesschauVideos, untertitelLesen, transkriptText, redezeit } = globalThis.WA_GEMEINSAM;
 
   // ------------------------------------------------------------ Artikeltext
 
@@ -269,6 +271,33 @@
     .pos-balken { height: 6px; border-radius: 3px; background: #555; margin-top: 2px; }
     h3 { font-size: 12px; font-weight: 600; margin: 10px 0 2px; color: #444; }
     #klapp { display: none; }
+    /* Fernsehbeitrag: Transkript mit Markierungen und ausführliche Fundstellen in der Leiste */
+    .tv { background: #eef5fc; border: 1px solid #b6d4f2; border-radius: 6px; padding: 6px 8px; margin: 6px 0; font-size: 12.5px; }
+    .artikel { font: 13.5px/1.55 Georgia, "Times New Roman", serif; }
+    .artikel .ueberschrift { font-weight: bold; font-size: 15px; margin: 4px 0 6px; }
+    .artikel p { margin: 0 0 7px; }
+    .artikel p.oton { padding-left: 7px; border-left: 2px solid #bbb; }
+    .artikel .markenname { display: block; font: 10.5px system-ui, "Segoe UI", sans-serif; color: #888; }
+    .artikel .blinken, .fundliste .blinken { background: #fff3bf; transition: background .3s; }
+    .wa { --wa: 120, 120, 120; background: rgba(var(--wa), .2); border-bottom: 2px solid rgb(var(--wa)); border-radius: 2px; }
+    .wa.strittig { background: rgba(var(--wa), .07); border-bottom-style: dashed; }
+    .wa.struktur { background: transparent; border-bottom-style: dotted; }
+    sup.nr { font: bold 9.5px system-ui, sans-serif; color: rgb(var(--wa)); margin-left: 1px; }
+    .d-wortwahl { --wa: 232, 128, 0; } .d-epistemisch { --wa: 156, 54, 181; } .d-quellen { --wa: 28, 126, 214; }
+    .d-auswahl { --wa: 47, 158, 68; } .d-ueberschrift { --wa: 224, 49, 49; }
+    .fundliste .fund { display: grid; grid-template-columns: 22px 1fr; gap: 6px; margin: 0; padding: 6px 4px; border-bottom: 1px solid #eee; border-radius: 0; }
+    .fundliste .nr-kreis { width: 20px; height: 20px; border-radius: 50%; color: #fff; font-weight: 700; font-size: 11px;
+      display: flex; align-items: center; justify-content: center; background: rgb(var(--wa)); }
+    .fundliste .dim { font-weight: 600; color: rgb(var(--wa)); font-size: 12px; }
+    .fundliste .zitat { font-family: Georgia, serif; }
+    .fundliste .begr, .fundliste .wirk, .fundliste .alt { font-size: 12.5px; margin-top: 1px; }
+    .fundliste .wirk { color: #7a5200; } .fundliste .alt { color: #1e7b34; }
+    .fundliste .etikett { font-size: 11px; border: 1px solid #ccc; border-radius: 4px; padding: 0 4px; margin-left: 4px; color: #555; font-weight: normal; }
+    .fundliste .leiter { display: flex; flex-wrap: wrap; gap: 3px; margin: 3px 0; font-size: 12px; }
+    .fundliste .leiter .pol { color: #999; font-weight: 700; }
+    .fundliste .stufe { border: 1px solid #ccc; border-radius: 4px; padding: 0 5px; color: #555; }
+    .fundliste .stufe.neutral { border-color: #2f9e44; color: #1e7b34; }
+    .fundliste .stufe.gewaehlt { background: #1b1b1b; border-color: #1b1b1b; color: #fff; font-weight: 600; }
     /* Handy: Leiste als Bereich am unteren Rand, einklappbar auf die Kopfzeile */
     @media (max-width: 640px) {
       .leiste { top: auto; bottom: 0; width: 100vw; height: 58vh; height: 58dvh; border-left: 0; border-top: 1px solid #ddd;
@@ -302,13 +331,14 @@
 
   const $ = (id) => schatten.getElementById(id);
   const leiste = schatten.querySelector(".leiste");
-  let zustand = { ergebnis: null, karte: null, laeuft: false, port: null, text: "", spiegel: null, spiegelLaeuft: false };
+  let zustand = { ergebnis: null, karte: null, laeuft: false, port: null, text: "", spiegel: null, spiegelLaeuft: false,
+    videos: [], video: null, url: location.href };
 
   const inhaltSetzen = (...kinder) => $("inhalt").replaceChildren(...kinder);
 
   $("zu").addEventListener("click", () => { leiste.hidden = true; });
   $("einst").addEventListener("click", () => chrome.runtime.sendMessage({ art: "einstellungen_oeffnen" }));
-  $("neu").addEventListener("click", () => starten({ neu: true }));
+  $("neu").addEventListener("click", () => starten({ neu: true, video: zustand.video }));
   $("pdf").addEventListener("click", berichtOeffnen);
   $("an").addEventListener("change", (e) => {
     document.documentElement.classList.toggle("wa-aus", !e.target.checked);
@@ -345,17 +375,84 @@
 
   // ------------------------------------------------------------ Ablauf
 
-  function starten({ neu = false, ganzeSeite = false } = {}) {
+  // Seiten mit ARD-Player und Untertiteln (tagesschau.de): zuerst die Auswahl zeigen, sonst gleich den Artikel analysieren
+  function beginnen() {
+    zustand.videos = tagesschauVideos(document);
+    if (zustand.videos.length) auswahlZeigen(); else starten();
+  }
+
+  function auswahlZeigen() {
     if (zustand.laeuft) return;
     leiste.hidden = false;
     $("pdf").disabled = true;
-    const text = ganzeSeite ? ganzeSeiteText() : artikelText();
-    if (!text) {
-      fehlerZeigen("kein_artikel", "Auf dieser Seite wurde kein Artikel erkannt (zu wenig zusammenhängender Text).");
-      return;
+    markierungenEntfernen();
+    const dauer = (s) => (s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} min` : "");
+    inhaltSetzen(
+      el("section", {}, el("h2", {}, "Fernsehbeiträge auf dieser Seite"),
+        el("div", { class: "klein" }, "Analysiert wird der Text der Untertitel, je Sprecherwechsel ein Absatz, mit gemessener Redezeit "
+          + "der O-Töne. Bilder, Einblendungen und Tonfall fehlen. Einzelne Beiträge sind die bessere Einheit als eine ganze Sendung."),
+        el("ul", {}, zustand.videos.map((v) => el("li", { class: "fund", onclick: () => starten({ video: v }) },
+          el("span", {}, el("b", {}, v.titel), " ›",
+            el("div", { class: "klein" }, [dauer(v.dauer_s), v.datum].filter(Boolean).join(" · ") || "Video mit Untertiteln")))))),
+      el("section", {}, el("h2", {}, "Artikeltext"),
+        el("div", { class: "klein" }, "Statt eines Videos den Text dieser Seite analysieren, wie auf anderen Nachrichtenseiten."),
+        el("button", { style: "margin-top:6px", onclick: () => starten() }, "Text der Seite analysieren")));
+  }
+
+  // Trägt ein anderes Video der Seite den Hinweis „live untertitelt“, gilt er auch für die daraus geschnittenen
+  // Einzelbeiträge (wie in tagesschau.py). Höchstens zwei weitere Dateien, Fehler zählen als „nicht live“.
+  async function seiteLiveUntertitelt(video) {
+    for (const v of zustand.videos.filter((x) => x !== video).slice(0, 2)) {
+      try {
+        const a = await fetch(v.untertitel, { credentials: "omit" });
+        if (a.ok && untertitelLesen(await a.text()).live) return true;
+      } catch { /* weiter */ }
+    }
+    return false;
+  }
+
+  // Eigene Adresse je Video für den Zwischenspeicher (Seite + Name der Untertiteldatei)
+  function videoAdresse(video) {
+    const u = new URL(location.href);
+    u.hash = "";
+    u.searchParams.set("wa_video", video.untertitel.split("/").pop());
+    return u.toString();
+  }
+
+  async function starten({ neu = false, ganzeSeite = false, video = null } = {}) {
+    if (zustand.laeuft) return;
+    leiste.hidden = false;
+    $("pdf").disabled = true;
+    zustand.video = video;
+    let text, tv = null, url = location.href;
+    if (video) {
+      zustand.laeuft = true;
+      ladenZeigen({ phase: "Untertitel werden geladen", sekunden: 0 });
+      try {
+        const antwort = await fetch(video.untertitel, { credentials: "omit" });
+        if (!antwort.ok) throw new Error(`HTTP ${antwort.status}`);
+        const { teile, live: eigenLive } = untertitelLesen(await antwort.text());
+        if (!teile.length) throw new Error("keine Untertitelzeilen");
+        const live = eigenLive || await seiteLiveUntertitelt(video);
+        text = transkriptText(location.href, video, teile, live);
+        tv = { titel: video.titel, untertitel: video.untertitel, datum: video.datum, live,
+          absaetze: teile.map(({ nr, farbe, beginn, ende, sekunden }) => ({ nr, farbe, beginn, ende, sekunden })) };
+        url = videoAdresse(video);
+      } catch (e) {
+        zustand.laeuft = false;
+        fehlerZeigen("untertitel", `Die Untertitel ließen sich nicht laden (${e.message}).`);
+        return;
+      }
+    } else {
+      text = ganzeSeite ? ganzeSeiteText() : artikelText();
+      if (!text) {
+        fehlerZeigen("kein_artikel", "Auf dieser Seite wurde kein Artikel erkannt (zu wenig zusammenhängender Text).");
+        return;
+      }
     }
     zustand.laeuft = true;
     zustand.text = text;
+    zustand.url = url;
     ladenZeigen({ phase: "wird vorbereitet", sekunden: 0 });
     const port = chrome.runtime.connect({ name: "analyse" });
     zustand.port = port;
@@ -371,7 +468,7 @@
       zustand.laeuft = false;
       fehlerZeigen("verbindung", "Die Verbindung zum Hintergrundskript ist abgebrochen. Bitte noch einmal versuchen.");
     });
-    port.postMessage({ art: "start", url: location.href, text, neu });
+    port.postMessage({ art: "start", url, text, neu, tv });
   }
 
   function ladenZeigen(stand) {
@@ -390,7 +487,7 @@
     const titel = {
       kein_artikel: "Kein Artikel erkannt", schluessel: "API-Schlüssel fehlt oder ist ungültig", modell: "Modell unbekannt",
       guthaben: "Kein API-Guthaben", limit: "Ratenlimit", server: "API gestört", netz: "Keine Verbindung",
-      abgelehnt: "Analyse abgelehnt", zu_lang: "Artikel zu lang",
+      abgelehnt: "Analyse abgelehnt", zu_lang: "Artikel zu lang", untertitel: "Untertitel nicht verfügbar",
     }[code] || "Fehler";
     const knoepfe = [];
     if (["schluessel", "modell", "guthaben"].includes(code)) {
@@ -399,8 +496,9 @@
     if (code === "kein_artikel") {
       knoepfe.push(el("button", { onclick: () => starten({ ganzeSeite: true }) }, "Ganze Seite analysieren"));
     } else {
-      knoepfe.push(el("button", { onclick: () => starten() }, "Noch einmal"));
+      knoepfe.push(el("button", { onclick: () => starten({ video: zustand.video }) }, "Noch einmal"));
     }
+    if (zustand.videos.length) knoepfe.push(el("button", { onclick: auswahlZeigen }, "Zur Videoauswahl"));
     inhaltSetzen(el("div", { class: "fehler" }, el("b", {}, titel), el("div", {}, text),
       el("div", { style: "margin-top:8px; display:flex; gap:6px;" }, knoepfe),
       el("div", { class: "klein", style: "margin-top:8px" }, `Addon-Version ${chrome.runtime.getManifest().version}`)));
@@ -409,7 +507,10 @@
   function ergebnisZeigen(ergebnis, ausSpeicher) {
     zustand.ergebnis = ergebnis;
     const a = ergebnis.analyse;
-    const karte = markieren(a.markierungen);
+    const tv = ergebnis.tv || null;
+    let karte;
+    if (tv) { markierungenEntfernen(); karte = { zuordnung: a.markierungen.map(() => -1), bereiche: [] }; }
+    else karte = markieren(a.markierungen);
     zustand.karte = karte;
     document.documentElement.classList.toggle("wa-aus", !$("an").checked);
 
@@ -421,7 +522,12 @@
       el("div", { class: "klein" }, a.gattung.begruendung),
       GATTUNG_KOMMENTAR.has(a.gattung.art) && el("div", { class: "klein", style: "margin-top:4px" }, "Bei Meinungstexten ist Wertung Teil der Gattung, kein Fehler."),
       a.kennzeichnungsproblem.vorhanden && el("div", { class: "warn" }, el("b", {}, "Kennzeichnungsproblem: "), a.kennzeichnungsproblem.begruendung),
-      textlage && el("div", { class: "warn" }, textlage)));
+      textlage && el("div", { class: "warn" }, textlage),
+      tv && el("div", { class: "tv" }, el("b", {}, `Fernsehbeitrag „${tv.titel}“: `),
+        `Text aus den ${tv.live ? "Live-Untertiteln" : "Untertiteln"}, je Sprecherwechsel ein Absatz. `
+        + "Bilder, Einblendungen und Tonfall sind nicht berücksichtigt; Namen erschließt die Analyse aus dem Text.",
+        zustand.videos.length > 1 && el("div", { style: "margin-top:6px" },
+          el("button", { onclick: auswahlZeigen }, "Anderes Video dieser Seite")))));
 
     // Kennzahl
     const k = kennzahlText(a.kennzahl);
@@ -457,15 +563,15 @@
       abschnitte.push(el("section", {}, el("h2", {}, "Strategische Muster"),
         el("div", { class: "klein" }, "Dieses Ergebnis stammt aus einer älteren Version ohne Musterprüfung. ↻ analysiert neu (kostet).")));
     } else {
-      const index = sm.muster.length ? seitenIndex() : null;
+      const index = sm.muster.length && !tv ? seitenIndex() : null;
       abschnitte.push(el("section", {}, el("h2", {}, `Strategische Muster (${sm.muster.length})`),
         sm.muster.length === 0 && el("div", {}, "Keine Muster gezielter Rahmung erkannt."),
         sm.muster.map((mu) => el("div", { class: "muster" },
           el("div", {}, el("b", {}, MUSTER[mu.art] || mu.art), mu.strittig && el("span", { class: "marke" }, "strittig")),
           el("div", { class: "klein" }, mu.begruendung),
           el("ul", {}, mu.belege.map((b) => {
-            const da = !!stelleFinden(index, b);
-            return el("li", { class: "fund" + (da ? "" : " fehlt"), onclick: () => da && stelleZeigen(b) },
+            const da = vorhanden(index, b);
+            return el("li", { class: "fund" + (da ? "" : " fehlt"), onclick: () => da && stelleAnzeigen(b) },
               el("span", {}, da ? "" : "⚠ ", `„${b}“`));
           })))),
         sm.leitbegriffe.length > 0 && el("div", { class: "klein", style: "margin-top:6px" }, "Leitbegriffe: ", sm.leitbegriffe.join(" · ")),
@@ -474,7 +580,7 @@
     }
 
     // Wer kommt zu Wort
-    abschnitte.push(stimmenAbschnitt(a.stimmen));
+    abschnitte.push(stimmenAbschnitt(a.stimmen, tv));
 
     // Spiegelprobe (auf Knopfdruck, eigener API-Aufruf)
     abschnitte.push(el("section", { id: "spiegel" }, spiegelInhalt()));
@@ -482,9 +588,10 @@
     // Neutrale Fassung
     abschnitte.push(el("section", {}, el("h2", {}, "Neutrale Fassung"), el("div", {}, a.neutrale_fassung)));
 
-    // Fundstellen
+    // Fundstellen: im Fernsehmodus steht der Text nicht auf der Seite, sondern als Transkript in der Leiste
+    if (tv) abschnitte.push(...transkriptAbschnitte(a, tv));
     const fehlend = karte.zuordnung.filter((z) => z < 0).length;
-    abschnitte.push(el("section", {}, el("h2", {}, `Fundstellen (${a.markierungen.length})`),
+    if (!tv) abschnitte.push(el("section", {}, el("h2", {}, `Fundstellen (${a.markierungen.length})`),
       fehlend > 0 && el("div", { class: "warn" }, `${fehlend} von ${a.markierungen.length} Fundstellen wurden im Seitentext nicht gefunden `
         + "(Seite geändert oder Text außerhalb des sichtbaren Bereichs). Sie stehen unten mit ⚠."),
       a.markierungen.length === 0 && el("div", { class: "klein" }, "Keine wertenden Stellen markiert."),
@@ -573,7 +680,7 @@
       zeigen(el("h2", {}, "Spiegelprobe"), el("div", { class: "warn" }, "Die Verbindung ist abgebrochen."),
         el("button", { onclick: spiegelStarten }, "Noch einmal"));
     });
-    port.postMessage({ art: "spiegel", url: location.href, text: zustand.text });
+    port.postMessage({ art: "spiegel", url: zustand.url, text: zustand.text });
   }
 
   function spiegelInhalt() {
@@ -624,7 +731,7 @@
   }
 
   // Verzeichnis der Stimmen: Aussagen je Position (Balken), je Typ, die Stimmen selbst, Akteure ohne Stimme
-  function stimmenAbschnitt(st) {
+  function stimmenAbschnitt(st, tv = null) {
     const titel = "Wer kommt zu Wort";
     if (!st) {
       return el("section", {}, el("h2", {}, titel),
@@ -632,7 +739,10 @@
     }
     const liste = st.liste;
     const { summe, positionen, mitHaltung, herkunft } = stimmenZaehlen(liste);
-    const index = liste.length ? seitenIndex() : null;
+    const index = liste.length && !tv ? seitenIndex() : null;
+    const rz = redezeit(st, tv);
+    const sekunden = new Map(rz ? rz.jeStimme.map((s) => [s.sprecher, s.sekunden]) : []);
+    const maxSek = rz ? Math.max(1, ...rz.positionen.map((p) => p.sekunden)) : 1;
 
     return el("section", {}, el("h2", {}, titel),
       liste.length === 0
@@ -643,14 +753,21 @@
         el("div", { class: "pos-kopf" }, el("span", {}, p.name),
           el("span", { class: "klein" }, `${p.aussagen} (${p.stimmen} ${p.stimmen === 1 ? "Stimme" : "Stimmen"})`)),
         el("div", { class: "pos-balken", style: `width:${summe ? Math.max(2, Math.round(100 * p.aussagen / summe)) : 0}%` }))),
+      rz && rz.gesamt > 0 && el("h3", {}, "Redezeit im O-Ton nach Position"),
+      rz && rz.gesamt > 0 && rz.positionen.map((p) => el("div", { class: "pos" },
+        el("div", { class: "pos-kopf" }, el("span", {}, p.name), el("span", { class: "klein" }, `${p.sekunden} s`)),
+        el("div", { class: "pos-balken", style: `width:${Math.max(2, Math.round(100 * p.sekunden / maxSek))}%` }))),
+      rz && rz.gesamt > 0 && el("div", { class: "klein" }, `O-Töne ${rz.oton} s, Sprechertext und Moderation ${rz.sprechertext} s `
+        + `von ${rz.gesamt} s. Gemessen an den Untertitelzeiten; die Zuordnung der Absätze stammt aus der Analyse.`),
       liste.length > 0 && el("h3", {}, "Aussagen nach Herkunft"),
       liste.length > 0 && el("div", { class: "klein" }, herkunft),
       liste.length > 0 && el("h3", {}, "Stimmen"),
       liste.length > 0 && el("ul", {}, liste.map((s) => {
-        const da = !!stelleFinden(index, s.erstes_vorkommen);
+        const da = vorhanden(index, s.erstes_vorkommen);
         return el("li", { class: "fund" + (da ? "" : " fehlt"), title: `„${s.erstes_vorkommen}“`,
-          onclick: () => da && stelleZeigen(s.erstes_vorkommen) },
+          onclick: () => da && stelleAnzeigen(s.erstes_vorkommen) },
           el("span", {}, da ? "" : "⚠ ", el("b", {}, s.sprecher), ` · ${s.aussagen}×`,
+            sekunden.get(s.sprecher) ? ` · ${sekunden.get(s.sprecher)} s O-Ton` : "",
             s.anonym && el("span", { class: "marke" }, "anonym"),
             el("div", { class: "klein" }, STIMMEN_TYP[s.typ] || s.typ, mitHaltung ? ` · ${s.position}` : "")));
       })),
@@ -659,6 +776,51 @@
         el("b", {}, o.akteur), `: ${o.rolle}`, VERMERK[o.vermerk] && el("span", { class: "marke" }, VERMERK[o.vermerk])))),
       el("div", { class: "klein", style: "margin-top:6px" },
         "Bestandsaufnahme aus dem Text, zählt nicht in Teilwerten und Kennzahl. Wer im Text gar nicht vorkommt, wird nicht als fehlend gewertet."));
+  }
+
+  // ------------------------------------------------------------ Fernsehmodus: Transkript in der Leiste
+
+  // Zitat im Seitentext (Artikel) oder im Transkript der Leiste (Fernsehbeitrag)
+  const vorhanden = (index, zitat) => (zustand.ergebnis && zustand.ergebnis.tv ? true : !!stelleFinden(index, zitat));
+  const stelleAnzeigen = (zitat) => (zustand.ergebnis && zustand.ergebnis.tv ? transkriptZeigen(zitat) : stelleZeigen(zitat));
+
+  function transkriptAbschnitte(a, tv) {
+    const zeilen = zeilenLesen(zustand.text);
+    const index = textIndex(zeilen);
+    const tk = bereicheFinden(index, a.markierungen);
+    const rz = redezeit(a.stimmen, tv);
+    const etikett = (z) => {
+      const sprecher = rz && rz.absatzStimme.get(z.nr);
+      if (!sprecher) return { text: `${z.nr} · Sprechertext`, oton: false };
+      return { text: `${z.nr} · ${/O-Ton/i.test(sprecher) ? sprecher : "O-Ton " + sprecher}`, oton: true };
+    };
+    const fehlend = tk.gefunden.filter((x) => !x).length;
+    return [
+      el("section", { id: "transkript" }, el("h2", {}, "Transkript mit Markierungen"),
+        el("div", { class: "klein" }, "Farben wie im Artikel; gestrichelt = strittig, gepunktet = nur strukturell. "
+          + "Ziffern verweisen auf die Fundstellen darunter."),
+        el("div", { class: "artikel" }, artikelDarstellen(zeilen, index, tk, a.markierungen, etikett))),
+      el("section", {}, el("h2", {}, `Fundstellen (${a.markierungen.length})`),
+        fehlend > 0 && el("div", { class: "warn" }, `${fehlend} Fundstellen stehen nicht wörtlich im Transkript (mit ⚠).`),
+        a.markierungen.length === 0 && el("div", { class: "klein" }, "Keine wertenden Stellen markiert."),
+        el("div", { class: "fundliste" }, tk.reihe.map((i) => fundDarstellen(a.markierungen[i], tk.nummer[i], tk.gefunden[i],
+          { onclick: () => transkriptZeigen(a.markierungen[i].zitat), style: "cursor:pointer" })))),
+    ];
+  }
+
+  // Springt im Transkript der Leiste zu dem Absatz, der das Zitat enthält, und hebt ihn kurz hervor
+  function transkriptZeigen(zitat) {
+    const z = normalisieren(zitat);
+    const ziel = [...schatten.querySelectorAll("#transkript .artikel > *")].find((e) => {
+      const kopie = e.cloneNode(true);
+      kopie.querySelectorAll(".markenname, sup").forEach((x) => x.remove());
+      return normalisieren(kopie.textContent).includes(z);
+    });
+    if (!ziel) return;
+    if (leiste.classList.contains("eingeklappt")) einklappen(false);
+    ziel.scrollIntoView({ behavior: "smooth", block: "center" });
+    ziel.classList.add("blinken");
+    setTimeout(() => ziel.classList.remove("blinken"), 1600);
   }
 
   function hinspringen(bi) {
@@ -733,5 +895,5 @@
   }, true);
   window.addEventListener("scroll", () => { if (beruehrung) $("tip").hidden = true; }, { passive: true });
 
-  starten();
+  beginnen();
 })();

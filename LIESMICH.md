@@ -17,6 +17,7 @@ Richtung, Kennzahl, neutrale Fassung) mit der Anthropic-API. Nicht zur Veröffen
 | `addon/bericht.html` · `.js` · `.css` | Druckansicht des Ergebnisses zum Speichern als PDF |
 | `addon/inhalt.js` · `addon/markierung.css` | Artikeltext mit Readability, Fundstellen im Seitentext suchen und markieren, Seitenleiste (Shadow DOM), Hinweis beim Überfahren |
 | `addon/einstellungen.html` · `.js` | Schlüssel, Modell, effort, Zwischenspeicher leeren |
+| `tagesschau.py` | holt die Untertitel einer tagesschau.de-Seite und legt je Video einen Text für `wertung.py` an |
 | `paket.py` | packt `addon/` als `dist/wertungsanalyse-<version>.zip` zum Signieren bei Mozilla |
 | `addon/lib/` | Mozilla Readability 0.6.0 (Apache-2.0), Herkunft in `HERKUNFT.md` |
 
@@ -67,7 +68,8 @@ Leerraum und Groß/Klein – dieselbe Regel nutzt das Addon), Zitate über zehn 
 Richtungsbelege ohne Markierung, Teilwerte ohne Markierung und umgekehrt. Für die strategischen Muster außerdem:
 Belege, die nicht im Artikel stehen oder über zehn Wörter haben, Muster ohne Beleg, mehr als acht Leitbegriffe.
 Für das Stimmenverzeichnis: erstes Vorkommen nicht im Artikel oder über zehn Wörter, Stimmen ohne Aussage,
-mehr zugeschriebene Aussagen als Sätze, mehr als fünf Akteure ohne Stimme.
+mehr zugeschriebene Aussagen als Sätze, mehr als fünf Akteure ohne Stimme; bei Fernsehtranskripten O-Ton-Absätze,
+die es im Text nicht gibt oder die mehreren Stimmen zugeordnet sind.
 Für Wirkung und Wortleiter: leere Wirkung, Wortleitern mit weniger als drei oder mehr als sieben Stufen oder
 Stellen außerhalb der Reihe, nicht strittige Markierungen, bei denen das gewählte Wort zugleich das neutrale ist,
 und der Anteil der Markierungen mit Wortleiter.
@@ -110,6 +112,58 @@ kein Beleg: Agenturvorlagen und Begriffe aus der Debatte selbst führen zum selb
 Teilwerte: Abweichung je Dimension, Mittel und Maximum. Markierungen: zwei Fundstellen gelten als dieselbe, wenn
 eine in der anderen steckt oder sie mindestens die Hälfte der Wörter teilen; daraus Anzahl gemeinsam, Jaccard
 (gemeinsam / alle verschiedenen) und wie viele der gemeinsamen dieselbe Dimension haben.
+
+### Fernsehbeiträge (tagesschau.de)
+
+Fernsehsendungen haben keinen Artikeltext, aber Untertitel. Auf tagesschau.de nennt jedes Video im Player-Datensatz
+(`data-v`) eine Untertiteldatei im Format EBU-TT (XML mit Zeitstempeln und einer Farbe je Sprecher), für die ganze
+Sendung und für einzelne Beiträge.
+
+**Transkript.** Je Farbwechsel ein Absatz mit der Marke `[Absatz N]`, davor `URL:`, eine Zeile `Quelle:`
+(Fernsehbeitrag, Untertitel, live oder nicht) und der Titel des Videos. Blaue Hinweise der Untertitelung
+(Live-Hinweis, Copyright) und Geräuschangaben wie „* Gong *“ fallen weg. Trägt ein Video der Seite den Hinweis
+„live untertitelt“, gilt er für alle: Die Einzelbeiträge sind wortgleich aus der Sendung geschnitten.
+
+**Prompt.** Der Abschnitt „Fernsehbeiträge“ in `prompt.md` gilt, wenn `Quelle:` oder `[Absatz N]` ein Transkript
+anzeigen: Moderation, Sprechertext und Korrespondenten sind die Stimme des Beitrags (wie Fließtext), O-Töne sind
+Zitate der Sprechenden; der Titel gilt als Überschrift, die Anmoderation als Vorspann; je O-Ton-Sprecher eine Stimme,
+nicht zusätzlich die Institution; über Bilder wird nicht spekuliert; offensichtliche Fehler der Live-Untertitel
+werden nicht gewertet. Gattungen: Beitrag `Bericht`/`Reportage`, Schaltgespräch `Analyse/Erklärstück`, „Die Meinung“
+`Kommentar/Meinung`, ganze Sendung `sonstige`.
+
+**Redezeit.** Jede Stimme hat im Schema das Feld `absaetze`: die Nummern ihrer O-Ton-Absätze (bei Artikeln leer).
+Aus diesen Nummern und den Untertitelzeiten errechnen Addon und Bericht die Redezeit je Stimme und je Position und
+den Anteil von Sprechertext und Moderation. Gemessen sind die Zeiten; wer welcher Absatz ist, bestimmt die Analyse.
+Farbe ist nicht Person (zwei verschiedene O-Töne können gelb sein), deshalb ordnet die Analyse zu, nicht die Farbe.
+
+**Im Addon.** Findet die Leiste auf einer Seite ARD-Player mit Untertiteln, zeigt sie zuerst eine Auswahl: die
+Videos und „Text der Seite analysieren“ (viele tagesschau.de-Seiten sind Artikel mit Video). Die Untertitel lädt das
+Inhaltsskript von derselben Domain, ohne zusätzliche Berechtigung. Ergebnisse werden je Video gemerkt (Adresse mit
+`?wa_video=<Untertiteldatei>`). Statt Markierungen auf der Seite zeigt die Leiste das Transkript mit Markierungen,
+je Absatz beschriftet („O-Ton …“ oder „Sprechertext“), darunter die Fundstellen ausführlich; Klicks auf Fundstellen,
+Musterbelege und Stimmen springen ins Transkript. „Wer kommt zu Wort“ zeigt zusätzlich die Redezeit, ebenso der
+PDF-Bericht.
+
+**Kommandozeile.**
+
+```powershell
+.venv\Scripts\python tagesschau.py https://www.tagesschau.de/multimedia/sendung/tagesschau_20_uhr
+.venv\Scripts\python wertung.py --nur ts_ --laeufe 1
+```
+
+Je Video entsteht in `testartikel/` eine `ts_<datum>_<titel>.txt` im selben Format wie im Addon und daneben
+`.stimmen.json` mit Farbe, Zeit, Sekunden und Wörtern je Absatz (`wertung.py` liest sie nicht). Vorhandene Dateien
+bleiben, `--neu` überschreibt.
+
+Grenzen:
+- Live-Untertitel können gekürzt oder umformuliert sein. Für die Wortwahl zählt, ob sie wörtlich sind:
+  stichprobenartig mit dem Ton vergleichen.
+- In der ganzen Sendung sprechen Moderation und Beitragstext beide weiß und laufen über Themengrenzen in einem
+  Absatz zusammen; die Sendung wird nicht in Beiträge geteilt. Einzelbeiträge sind die bessere Einheit.
+- Namen stehen nur im Bild; die Analyse erschließt sie aus dem Text oder nennt die Rolle.
+- Bilder, Grafiken, Einblendungen, Tonfall und Musik fehlen ganz.
+- Erprobt mit blinden Subagenten an der 20-Uhr-Sendung vom 20.11.2026 (zwei Einzelbeiträge, eine ganze Sendung),
+  noch nicht mit der API.
 
 ### Spiegeltests
 

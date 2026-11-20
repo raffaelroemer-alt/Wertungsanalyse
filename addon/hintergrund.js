@@ -98,6 +98,7 @@ chrome.runtime.onConnect.addListener((port) => {
       }
       const ergebnis = await analysieren(nachricht.text, (stand) => senden({ art: "stand", ...stand }), abbruch.signal);
       ergebnis.url = nachricht.url;
+      if (nachricht.tv) ergebnis.tv = nachricht.tv; // Fernsehbeitrag: Absätze mit Zeiten für die Redezeit
       await chrome.storage.local.set({ [schluessel]: ergebnis });
       senden({ art: "fertig", ergebnis, spiegel: gemerkterSpiegel, ausSpeicher: false });
     } catch (e) {
