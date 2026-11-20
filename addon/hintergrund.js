@@ -46,9 +46,15 @@ function hinweisAmSymbol(tabId, text) {
   }, 6000);
 }
 
-chrome.runtime.onMessage.addListener((nachricht, absender) => {
+chrome.runtime.onMessage.addListener((nachricht, absender, antworten) => {
   if (nachricht?.art === "einstellungen_oeffnen") chrome.runtime.openOptionsPage();
-  if (nachricht?.art === "bericht_oeffnen") berichtOeffnen(nachricht.daten, absender.tab);
+  if (nachricht?.art === "bericht_oeffnen") {
+    // Antwort an die Leiste, damit ein Fehler dort sichtbar wird statt still zu verschwinden
+    berichtOeffnen(nachricht.daten, absender.tab).then(
+      () => antworten({ ok: true }),
+      (e) => antworten({ ok: false, text: (e && e.message) || String(e) }));
+    return true; // Antwort kommt asynchron
+  }
 });
 
 // Bericht: Daten unter eigener Nummer ablegen (nur die letzten fünf bleiben), Druckansicht neben dem Artikel öffnen
@@ -58,8 +64,13 @@ async function berichtOeffnen(daten, tab) {
   const alt = Object.keys(await chrome.storage.local.get(null)).filter((k) => k.startsWith("bericht:")).sort();
   await chrome.storage.local.remove(alt.slice(0, Math.max(0, alt.length - (BERICHTE_BEHALTEN - 1))));
   await chrome.storage.local.set({ ["bericht:" + id]: daten });
-  await chrome.tabs.create({ url: chrome.runtime.getURL("bericht.html?id=" + id),
-    ...(tab ? { index: tab.index + 1, openerTabId: tab.id } : {}) });
+  const url = chrome.runtime.getURL("bericht.html?id=" + id);
+  try {
+    await chrome.tabs.create({ url, ...(tab ? { index: tab.index + 1, openerTabId: tab.id } : {}) });
+  } catch {
+    // Firefox für Android kennt openerTabId nicht und lehnt dann den ganzen Aufruf ab: nur mit der Adresse öffnen
+    await chrome.tabs.create({ url });
+  }
 }
 
 // ---------------------------------------------------------------- Analyse über einen Port

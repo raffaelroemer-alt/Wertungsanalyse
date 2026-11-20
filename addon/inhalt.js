@@ -515,13 +515,31 @@
   // ------------------------------------------------------------ Bericht als PDF
 
   // Übergibt Ergebnis, Spiegelprobe und Artikeltext ans Hintergrundskript; das öffnet die Druckansicht bericht.html.
+  // Rückmeldung per Callback statt Promise: funktioniert gleich in Chrome und Firefox.
   function berichtOeffnen() {
     if (!zustand.ergebnis) return;
-    chrome.runtime.sendMessage({ art: "bericht_oeffnen", daten: {
-      ergebnis: zustand.ergebnis, spiegel: zustand.spiegel, text: zustand.text,
-      url: location.href, titel: document.title, erstellt: new Date().toISOString(),
-      version: chrome.runtime.getManifest().version,
-    } });
+    $("pdf").disabled = true;
+    $("pdf-fehler")?.remove();
+    const fertig = (fehler) => {
+      $("pdf").disabled = false;
+      if (!fehler) return;
+      $("inhalt").prepend(el("div", { class: "warn", id: "pdf-fehler" },
+        el("b", {}, "PDF-Bericht ließ sich nicht öffnen: "), fehler,
+        el("div", { class: "klein" }, `Addon-Version ${chrome.runtime.getManifest().version}`)));
+      $("inhalt").scrollTop = 0;
+    };
+    try {
+      chrome.runtime.sendMessage({ art: "bericht_oeffnen", daten: {
+        ergebnis: zustand.ergebnis, spiegel: zustand.spiegel, text: zustand.text,
+        url: location.href, titel: document.title, erstellt: new Date().toISOString(),
+        version: chrome.runtime.getManifest().version,
+      } }, (antwort) => {
+        const le = chrome.runtime.lastError;
+        fertig(le ? le.message : antwort && antwort.ok ? null : (antwort && antwort.text) || "keine Antwort vom Hintergrundskript");
+      });
+    } catch (e) {
+      fertig(e.message);
+    }
   }
 
   // ------------------------------------------------------------ Spiegelprobe

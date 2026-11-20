@@ -188,9 +188,18 @@ Firefox für Android installiert nur von Mozilla signierte Erweiterungen. Einmal
 2. Auf addons.mozilla.org mit einem Mozilla-Konto anmelden, **Neues Add-on einreichen**, als Vertriebsweg
    **„Auf eigene Faust“ (unlisted)** wählen und die ZIP hochladen. Das Add-on wird so nicht veröffentlicht, nur
    automatisch geprüft und signiert. Danach die signierte `.xpi` herunterladen.
-3. Die `.xpi` aufs Handy bringen (Android 10 oder neuer). In Firefox unter **Einstellungen › Über Firefox** auf das
-   Logo tippen, bis „Debug-Menü aktiviert“ erscheint (meist fünfmal). Dann gibt es unter Einstellungen (Abschnitt
-   Erweitert) **Add-on aus Datei installieren**; dort die `.xpi` wählen. Ohne Signatur geht das nur in Firefox Nightly.
+3. Die `.xpi` aufs Handy bringen (Android 10 oder neuer) und installieren. Stolpersteine aus der ersten Installation:
+   - Der Dateimanager kann eine `.xpi` nicht an Firefox übergeben; Antippen der Datei tut nichts.
+   - Der Download-Link aus dem Entwicklerbereich (`addons.mozilla.org/firefox/downloads/file/…`) liefert bei
+     „unlisted“ nur angemeldet die Datei, sonst 404. Er muss also **in Firefox** geöffnet werden (Link kopieren,
+     in die Adresszeile einfügen), nicht im Standardbrowser Chrome, und in diesem Firefox muss man bei
+     addons.mozilla.org angemeldet sein. Die Handyansicht der Seite verlinkt den Entwicklerbereich nicht;
+     direkt `addons.mozilla.org/de/developers/addons` aufrufen.
+   - Öffnet Firefox den Link, bleibt die Seite womöglich leer; die Datei liegt dann unter Menü › Downloads.
+   - Installiert wird sie über einen versteckten Menüpunkt: **Einstellungen › Über Firefox**, auf das Firefox-Logo
+     tippen, bis nach einem Restzähler „Debug-Menü aktiviert“ erscheint. Dann steht in den Einstellungen unter
+     **Erweitert** der Punkt **Add-on aus Datei installieren**; dort die `.xpi` aus „Downloads“ wählen.
+   Ohne Signatur geht das nur in Firefox Nightly.
 4. Im Firefox-Menü › Erweiterungen › Wertungsanalyse › Einstellungen den API-Schlüssel eintragen
    (er liegt nur in diesem Firefox, getrennt vom Chrome-Profil).
 
