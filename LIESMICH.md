@@ -11,12 +11,13 @@ Richtung, Kennzahl, neutrale Fassung) mit der Anthropic-API. Nicht zur Veröffen
 | `addon/analyse/schema.json` | JSON-Schema der Antwort (strukturierte Ausgabe über `output_config.format`) |
 | `addon/analyse/spiegel_prompt.md` · `spiegel_schema.json` | Spiegelprobe: Gegenfassung mit vertauschten Seiten, gleicher Machart und Stärke, ohne neue Fakten oder Zitate |
 | `wertung.py` | Kommandozeile: analysiert `testartikel/`, speichert `ergebnisse/<artikel>/laufN.json`, vergleicht zwei Läufe, schreibt `ergebnisse/uebersicht.md` |
-| `addon/manifest.json` | Chrome-Addon, Manifest V3, Rechte: `activeTab`, `scripting`, `storage`, Zugriff nur auf `api.anthropic.com` |
+| `addon/manifest.json` | Addon für Chrome und Firefox (auch Android), Manifest V3, Rechte: `activeTab`, `scripting`, `storage`, Zugriff nur auf `api.anthropic.com` |
 | `addon/hintergrund.js` | Service Worker: Klick aufs Symbol → Skripte in den Tab; API-Aufruf (Streaming, strukturierte Ausgabe); Zwischenspeicher je Adresse |
 | `addon/gemeinsam.js` | Bezeichnungen, Textvereinheitlichung und Spiegelvergleich, gemeinsam für Seitenleiste und Bericht |
 | `addon/bericht.html` · `.js` · `.css` | Druckansicht des Ergebnisses zum Speichern als PDF |
 | `addon/inhalt.js` · `addon/markierung.css` | Artikeltext mit Readability, Fundstellen im Seitentext suchen und markieren, Seitenleiste (Shadow DOM), Hinweis beim Überfahren |
 | `addon/einstellungen.html` · `.js` | Schlüssel, Modell, effort, Zwischenspeicher leeren |
+| `paket.py` | packt `addon/` als `dist/wertungsanalyse-<version>.zip` zum Signieren bei Mozilla |
 | `addon/lib/` | Mozilla Readability 0.6.0 (Apache-2.0), Herkunft in `HERKUNFT.md` |
 
 Prompt und Schema liegen im Addon-Ordner, weil Chrome nur Dateien innerhalb des Addons lesen kann.
@@ -172,6 +173,35 @@ als solcher gekennzeichnet. Sie liegt wie alle Ergebnisse in `ergebnisse/` und d
    (Vorgabe Opus 5.5, `high`) lassen sich dort ändern.
 
 Nach Änderungen am Code auf `chrome://extensions` beim Addon auf ↻ klicken und die Artikelseite neu laden.
+
+### Handy (Firefox für Android)
+
+Chrome auf Android lädt keine Erweiterungen, Firefox für Android schon (ab Version 142). Dasselbe Addon läuft dort:
+Das Manifest nennt `service_worker` für Chrome und `scripts` für Firefox (jeder Browser nimmt seins), dazu unter
+`browser_specific_settings.gecko` eine feste ID und die Angabe, welche Daten das Addon überträgt
+(`websiteContent`, `browsingActivity`: Artikeltext und Adresse gehen an die Anthropic-API). Chrome meldet den
+Schlüssel `browser_specific_settings` als unbekannt; das ist nur ein Hinweis.
+
+Firefox für Android installiert nur von Mozilla signierte Erweiterungen. Einmal je Version:
+
+1. `python paket.py` → `dist/wertungsanalyse-<version>.zip`.
+2. Auf addons.mozilla.org mit einem Mozilla-Konto anmelden, **Neues Add-on einreichen**, als Vertriebsweg
+   **„Auf eigene Faust“ (unlisted)** wählen und die ZIP hochladen. Das Add-on wird so nicht veröffentlicht, nur
+   automatisch geprüft und signiert. Danach die signierte `.xpi` herunterladen.
+3. Die `.xpi` aufs Handy bringen (Android 10 oder neuer). In Firefox unter **Einstellungen › Über Firefox** auf das
+   Logo tippen, bis „Debug-Menü aktiviert“ erscheint (meist fünfmal). Dann gibt es unter Einstellungen (Abschnitt
+   Erweitert) **Add-on aus Datei installieren**; dort die `.xpi` wählen. Ohne Signatur geht das nur in Firefox Nightly.
+4. Im Firefox-Menü › Erweiterungen › Wertungsanalyse › Einstellungen den API-Schlüssel eintragen
+   (er liegt nur in diesem Firefox, getrennt vom Chrome-Profil).
+
+Für eine neue Version im Manifest `version` erhöhen und die Schritte 1–3 wiederholen (bei Mozilla „Neue Version
+hochladen“ beim selben Add-on).
+
+Auf dem Handy: Analyse über das Firefox-Menü › Erweiterungen › Wertungsanalyse starten. Die Leiste erscheint
+unten; ▾ klappt sie auf die Kopfzeile zu, damit der Artikel lesbar bleibt (auch ein Tipp auf „Wertungsanalyse“).
+Ein Tipp auf eine Markierung zeigt den Hinweis und folgt keinem Link; ein zweiter Tipp oder Scrollen schließt ihn.
+Sprünge aus der Leiste holen die Stelle ins obere Drittel, über die Leiste. „PDF“ öffnet die Druckansicht in
+Bildschirmbreite; gespeichert wird über den Druck von Firefox.
 
 ### Benutzen
 

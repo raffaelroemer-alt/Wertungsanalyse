@@ -11,3 +11,4 @@ __pycache__/
 # Schlüssel gehören nie ins Repository
 .env
 *.key
+dist/

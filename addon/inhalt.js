@@ -190,7 +190,7 @@
   function stelleZeigen(zitat) {
     const r = stelleFinden(seitenIndex(), zitat);
     if (!r) return;
-    (r.startContainer.parentElement || document.body).scrollIntoView({ behavior: "smooth", block: "center" });
+    hinscrollen(r, r.startContainer.parentElement || document.body);
     if (window.CSS && CSS.highlights && typeof Highlight === "function") {
       CSS.highlights.set("wa-muster", new Highlight(r));
       clearTimeout(WA.musterZeit);
@@ -268,14 +268,31 @@
     .pos-kopf span:first-child { flex: 1; }
     .pos-balken { height: 6px; border-radius: 3px; background: #555; margin-top: 2px; }
     h3 { font-size: 12px; font-weight: 600; margin: 10px 0 2px; color: #444; }
+    #klapp { display: none; }
+    /* Handy: Leiste als Bereich am unteren Rand, einklappbar auf die Kopfzeile */
+    @media (max-width: 640px) {
+      .leiste { top: auto; bottom: 0; width: 100vw; height: 58vh; height: 58dvh; border-left: 0; border-top: 1px solid #ddd;
+        border-radius: 14px 14px 0 0; box-shadow: 0 -4px 18px rgba(0,0,0,.2); font-size: 14.5px; }
+      .leiste.eingeklappt { height: auto; }
+      .leiste.eingeklappt .inhalt { display: none; }
+      header { border-radius: 14px 14px 0 0; padding: 8px 8px 8px 12px; gap: 4px; }
+      header h1 { cursor: pointer; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      button { font-size: 14px; padding: 6px 8px; }
+      label.schalter span { display: none; }
+      #klapp { display: inline-block; }
+      label.schalter { font-size: 13px; }
+      .klein { font-size: 13px; }
+      .tip { font-size: 14px; }
+    }
   </style>
   <div class="leiste">
     <header>
-      <h1>Wertungsanalyse</h1>
-      <label class="schalter" title="Markierungen im Artikel ein- oder ausblenden"><input type="checkbox" id="an" checked> Markierungen</label>
+      <h1 id="titel">Wertungsanalyse</h1>
+      <label class="schalter" title="Markierungen im Artikel ein- oder ausblenden"><input type="checkbox" id="an" checked><span> Markierungen</span></label>
       <button id="pdf" title="Bericht als PDF (öffnet die Druckansicht in einem neuen Tab)" disabled>PDF</button>
       <button id="neu" title="Neu analysieren (kostet einen API-Aufruf)">↻</button>
       <button id="einst" title="Einstellungen">⚙</button>
+      <button id="klapp" title="Leiste ein- oder ausklappen">▾</button>
       <button id="zu" title="Leiste schließen (Klick aufs Symbol öffnet sie wieder)">✕</button>
     </header>
     <div class="inhalt" id="inhalt"></div>
@@ -300,6 +317,32 @@
 
   WA.klick = () => { leiste.hidden = !leiste.hidden; };
 
+  // Handy: Leiste auf die Kopfzeile einklappen, damit der Artikel mit Markierungen lesbar bleibt
+  const schmal = () => window.matchMedia("(max-width: 640px)").matches;
+  const einklappen = (zu) => {
+    leiste.classList.toggle("eingeklappt", zu);
+    $("klapp").textContent = zu ? "▴" : "▾";
+  };
+  $("klapp").addEventListener("click", () => einklappen(!leiste.classList.contains("eingeklappt")));
+  $("titel").addEventListener("click", () => { if (schmal()) einklappen(!leiste.classList.contains("eingeklappt")); });
+
+  // Stelle in den sichtbaren Bereich holen; auf dem Handy ins obere Drittel, über der Leiste
+  function hinscrollen(quelle, element) {
+    if (schmal()) {
+      const r = quelle.getBoundingClientRect();
+      window.scrollBy({ top: r.top - window.innerHeight * 0.15, behavior: "smooth" });
+    } else {
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+
+  // Firefox beendet seine Hintergrundseite nach Leerlauf; eine Nachricht alle 15 s hält sie während der Analyse wach
+  function wachHalten(port) {
+    const t = setInterval(() => { try { port.postMessage({ art: "ping" }); } catch { clearInterval(t); } }, 15000);
+    port.onDisconnect.addListener(() => clearInterval(t));
+    return () => clearInterval(t);
+  }
+
   // ------------------------------------------------------------ Ablauf
 
   function starten({ neu = false, ganzeSeite = false } = {}) {
@@ -316,11 +359,12 @@
     ladenZeigen({ phase: "wird vorbereitet", sekunden: 0 });
     const port = chrome.runtime.connect({ name: "analyse" });
     zustand.port = port;
+    const halt = wachHalten(port);
     let erledigt = false;
     port.onMessage.addListener((n) => {
       if (n.art === "stand") ladenZeigen(n);
-      else if (n.art === "fertig") { erledigt = true; zustand.laeuft = false; port.disconnect(); zustand.spiegel = n.spiegel || null; ergebnisZeigen(n.ergebnis, n.ausSpeicher); }
-      else if (n.art === "fehler") { erledigt = true; zustand.laeuft = false; port.disconnect(); fehlerZeigen(n.code, n.text); }
+      else if (n.art === "fertig") { erledigt = true; halt(); zustand.laeuft = false; port.disconnect(); zustand.spiegel = n.spiegel || null; ergebnisZeigen(n.ergebnis, n.ausSpeicher); }
+      else if (n.art === "fehler") { erledigt = true; halt(); zustand.laeuft = false; port.disconnect(); fehlerZeigen(n.code, n.text); }
     });
     port.onDisconnect.addListener(() => {
       if (erledigt) return;
@@ -490,8 +534,9 @@
     const zeigen = (...k) => abschnitt && abschnitt.replaceChildren(...k);
     zeigen(el("h2", {}, "Spiegelprobe"), el("div", { class: "klein" }, "wird vorbereitet …"));
     const port = chrome.runtime.connect({ name: "analyse" });
+    const halt = wachHalten(port);
     let erledigt = false;
-    const ende = () => { erledigt = true; zustand.spiegelLaeuft = false; port.disconnect(); };
+    const ende = () => { erledigt = true; halt(); zustand.spiegelLaeuft = false; port.disconnect(); };
     port.onMessage.addListener((n) => {
       if (n.art === "stand") {
         zeigen(el("h2", {}, "Spiegelprobe"),
@@ -601,7 +646,7 @@
   function hinspringen(bi) {
     const marks = zustand.karte.bereiche[bi].marks;
     if (!marks.length) return;
-    marks[0].scrollIntoView({ behavior: "smooth", block: "center" });
+    hinscrollen(marks[0], marks[0]);
     for (const m of marks) m.classList.add("wa-blinken");
     setTimeout(() => marks.forEach((m) => m.classList.remove("wa-blinken")), 1600);
   }
@@ -621,12 +666,11 @@
       el("span", { class: "pol" }, "+"));
   }
 
-  document.addEventListener("mouseover", (e) => {
-    const mark = e.target instanceof Element ? e.target.closest("wa-mark") : null;
+  // Zeigt Begründung, Wirkung, Wortleiter und Alternative zu einer Markierung; gibt false zurück, wenn es nichts zu zeigen gibt
+  function hinweisZeigen(mark) {
     const tip = $("tip");
-    if (!mark || !zustand.karte || document.documentElement.classList.contains("wa-aus")) { tip.hidden = true; return; }
-    const bereich = zustand.karte.bereiche[Number(mark.dataset.wa)];
-    if (!bereich) return;
+    const bereich = zustand.karte && zustand.karte.bereiche[Number(mark.dataset.wa)];
+    if (!bereich) return false;
     tip.replaceChildren(...bereich.befunde.map((i) => {
       const m = zustand.ergebnis.analyse.markierungen[i];
       const d = DIM[m.dimension];
@@ -639,12 +683,37 @@
         el("div", { class: "alt" }, "Neutral: " + m.alternative));
     }));
     tip.hidden = false;
+    tip.dataset.wa = mark.dataset.wa;
     const r = mark.getBoundingClientRect();
     const breite = Math.min(360, window.innerWidth - 20);
     tip.style.left = Math.max(10, Math.min(r.left, window.innerWidth - breite - 10)) + "px";
     const hoehe = tip.offsetHeight;
     tip.style.top = (r.bottom + 8 + hoehe < window.innerHeight ? r.bottom + 8 : Math.max(10, r.top - hoehe - 8)) + "px";
+    return true;
+  }
+
+  const markeUnter = (e) => (e.target instanceof Element ? e.target.closest("wa-mark") : null);
+  const markierungenAn = () => !!zustand.karte && !document.documentElement.classList.contains("wa-aus");
+  // Geräte ohne Maus melden beim Tippen ebenfalls "mouseover"; dort entscheidet allein der Tipp
+  const beruehrung = window.matchMedia("(hover: none)").matches;
+
+  document.addEventListener("mouseover", (e) => {
+    if (beruehrung) return;
+    const mark = markeUnter(e);
+    if (!mark || !markierungenAn() || !hinweisZeigen(mark)) $("tip").hidden = true;
   });
+
+  // Antippen: erster Tipp auf eine Markierung zeigt den Hinweis (und folgt keinem Link), ein zweiter Tipp
+  // auf dieselbe Stelle schließt ihn und verhält sich wieder normal; Tippen daneben schließt ihn.
+  document.addEventListener("click", (e) => {
+    if (!beruehrung || e.target === host) return;
+    const tip = $("tip");
+    const mark = markeUnter(e);
+    if (!mark || !markierungenAn()) { tip.hidden = true; return; }
+    if (!tip.hidden && tip.dataset.wa === mark.dataset.wa) { tip.hidden = true; return; }
+    if (hinweisZeigen(mark)) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
+  window.addEventListener("scroll", () => { if (beruehrung) $("tip").hidden = true; }, { passive: true });
 
   starten();
 })();

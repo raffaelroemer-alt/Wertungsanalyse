@@ -1,12 +1,20 @@
 {
   "manifest_version": 3,
   "name": "Wertungsanalyse",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Analysiert den Artikel im aktiven Tab auf Wertung und markiert die Stellen (privat, eigener API-Schlüssel).",
   "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": ["https://api.anthropic.com/*"],
-  "background": {"service_worker": "hintergrund.js"},
+  "background": {"service_worker": "hintergrund.js", "scripts": ["hintergrund.js"]},
   "action": {"default_title": "Artikel auf Wertung analysieren"},
-  "options_page": "einstellungen.html",
-  "minimum_chrome_version": "116"
+  "options_ui": {"page": "einstellungen.html", "open_in_tab": true},
+  "minimum_chrome_version": "121",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "{41bb2475-dcbf-4def-804e-ab9bcf4289c9}",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {"required": ["websiteContent", "browsingActivity"], "optional": []}
+    },
+    "gecko_android": {"strict_min_version": "142.0"}
+  }
 }

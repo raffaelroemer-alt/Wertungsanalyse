@@ -1,4 +1,4 @@
-// Hintergrundskript (Service Worker): startet die Analyse auf Klick, ruft die Anthropic-API auf und
+// Hintergrundskript (Service Worker in Chrome, Hintergrundseite in Firefox): startet die Analyse auf Klick, ruft die Anthropic-API auf und
 // speichert Ergebnisse je Adresse. Der API-Schlüssel liegt nur in chrome.storage.local.
 
 const VORGABEN = { modell: "claude-opus-5-5", effort: "high" };
@@ -34,13 +34,15 @@ chrome.action.onClicked.addListener(async (tab) => {
   }
 });
 
+// Firefox für Android kennt kein Abzeichen am Symbol: jeden Aufruf einzeln absichern
 function hinweisAmSymbol(tabId, text) {
-  chrome.action.setBadgeBackgroundColor({ tabId, color: "#b00020" });
-  chrome.action.setBadgeText({ tabId, text: "!" });
-  chrome.action.setTitle({ tabId, title: text });
+  const versuchen = (f) => { try { Promise.resolve(f()).catch(() => {}); } catch { /* nicht unterstützt */ } };
+  versuchen(() => chrome.action.setBadgeBackgroundColor({ tabId, color: "#b00020" }));
+  versuchen(() => chrome.action.setBadgeText({ tabId, text: "!" }));
+  versuchen(() => chrome.action.setTitle({ tabId, title: text }));
   setTimeout(() => {
-    chrome.action.setBadgeText({ tabId, text: "" });
-    chrome.action.setTitle({ tabId, title: "Artikel auf Wertung analysieren" });
+    versuchen(() => chrome.action.setBadgeText({ tabId, text: "" }));
+    versuchen(() => chrome.action.setTitle({ tabId, title: "Artikel auf Wertung analysieren" }));
   }, 6000);
 }
 
@@ -157,7 +159,7 @@ async function apiAufruf(promptDatei, schemaDatei, text, melden, signal, erzwung
   }
 
   const beginn = Date.now();
-  // Hält den Service Worker während langer Anfragen wach (jeder Erweiterungsaufruf setzt den Leerlauf zurück)
+  // Hält den Service Worker (Chrome) während langer Anfragen wach; in Firefox tut das das "ping" der Leiste über den Port
   const wach = setInterval(() => { chrome.runtime.getPlatformInfo(() => {}); }, 20000);
   try {
     melden({ phase: "sendet", sekunden: 0 });
