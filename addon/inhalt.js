@@ -8,7 +8,7 @@
     zeichen, normalisieren, kennzahlText, spiegelVergleich, stimmenZaehlen, metaText, el,
     zeilenLesen, textIndex, bereicheFinden, artikelDarstellen, fundDarstellen,
     tagesschauVideos, untertitelLesen, transkriptText, redezeit, beitraegeBerechnen, beitraegeDarstellen,
-    youtubeAbschnitte, youtubeAbsaetze, youtubeText, absatzEtikett } = globalThis.WA_GEMEINSAM;
+    youtubeAbschnitte, youtubeAbsaetze, youtubeText, absatzEtikett, zitatwertungenDarstellen } = globalThis.WA_GEMEINSAM;
 
   // ------------------------------------------------------------ Artikeltext
 
@@ -306,6 +306,7 @@
     .beitrag:hover { background: #f4f4f4; }
     .beitrag-titel b { font-size: 13px; }
     .ohne-ut { color: #888; }
+    .marke.unw { border-color: #e8a23a; color: #8a5300; background: #fff4e5; }
     .fundliste .stufe.gewaehlt { background: #1b1b1b; border-color: #1b1b1b; color: #fff; font-weight: 600; }
     /* Handy: Leiste als Bereich am unteren Rand, einklappbar auf die Kopfzeile */
     @media (max-width: 640px) {
@@ -726,6 +727,16 @@
 
     // Wer kommt zu Wort
     abschnitte.push(stimmenAbschnitt(a.stimmen, tv));
+
+    // Wertung über Zitate („opportune Zeugen“)
+    if (a.zitatwertungen) {
+      const index = !tv && a.zitatwertungen.liste.length ? seitenIndex() : null;
+      abschnitte.push(el("section", {}, el("h2", {}, `Wertung über Zitate (${a.zitatwertungen.liste.length})`),
+        zitatwertungenDarstellen(a.zitatwertungen, { marke: "marke", da: (z) => vorhanden(index, z), zeigen: stelleAnzeigen })));
+    } else if (a.stimmen) {
+      abschnitte.push(el("section", {}, el("h2", {}, "Wertung über Zitate"),
+        el("div", { class: "klein" }, "Dieses Ergebnis stammt aus einer älteren Version ohne diese Prüfung. ↻ analysiert neu (kostet).")));
+    }
 
     // Spiegelprobe (auf Knopfdruck, eigener API-Aufruf)
     abschnitte.push(el("section", { id: "spiegel" }, spiegelInhalt()));

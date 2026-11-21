@@ -87,6 +87,7 @@ sup.nr { font: bold 6.5pt "Segoe UI", system-ui, sans-serif; color: rgb(var(--wa
   padding-top: 5px; margin: 12px 0 5px; break-after: avoid; }
 .beitraege .beitrag { padding: 5px 0; border-bottom: 1px solid #eee; break-inside: avoid; }
 .beitraege .beitrag-titel b { font-size: 10pt; }
+.etikett.unw { border-color: #e8a23a; color: #8a5300; background: #fff4e5; }
 .legende { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 8pt; color: #555; margin: 4px 0 8px; }
 
 /* Fundstellen */

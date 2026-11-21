@@ -92,6 +92,8 @@ globalThis.WA_GEMEINSAM = (() => {
     if (!musterGleich) abweichend.push("Muster");
     if (a.kennzeichnungsproblem.vorhanden !== s.kennzeichnungsproblem.vorhanden) abweichend.push("Kennzeichnung");
     if (a.richtung.einordnung !== s.richtung.einordnung) abweichend.push("Richtung");
+    if (a.zitatwertungen && s.zitatwertungen
+        && a.zitatwertungen.einschaetzung.einordnung !== s.zitatwertungen.einschaetzung.einordnung) abweichend.push("Wertung über Zitate");
     const namen = (menge) => [...menge].map((x) => MUSTER[x] || x).join(", ") || "keine";
     const richtung = (r) => RICHTUNG_KURZ[r.einordnung] + (r.zugunsten.length ? ` zugunsten ${r.zugunsten.join(", ")}` : "");
     return { abweichend, teilwerte, mo, ms, so, ss, musterGleich, namen, richtung };
@@ -441,6 +443,48 @@ globalThis.WA_GEMEINSAM = (() => {
     return { text: `${z.nr} · ${/O-Ton/i.test(sprecher) ? sprecher : "O-Ton " + sprecher}`, oton: true };
   }
 
+  // ------------------------------------------------------------ Wertung über Zitate („opportune Zeugen“)
+
+  const ZW_EINORDNUNG = { keine_wertenden_zitate: "Keine wertenden Zitate", ausgewogen: "Ausgewogen",
+    ueberwiegend_eine_seite: "Überwiegend eine Seite", einseitig: "Einseitig" };
+  const ZW_BEHANDLUNG = { unwidersprochen: "unwidersprochen", nachgefragt: "nachgefragt", widersprochen: "widersprochen",
+    eingeordnet: "eingeordnet", gegenstimme: "Gegenstimme im Text" };
+
+  // Abschnitt-Inhalt für Leiste und Bericht. opt.marke: CSS-Klasse für Etiketten; opt.da(zitat) / opt.zeigen(zitat): Sprung zur Stelle
+  function zitatwertungenDarstellen(zw, opt = {}) {
+    const marke = opt.marke || "etikett";
+    const liste = zw.liste || [];
+    // Bilanz je Seite: wertende Zitate und davon unwidersprochen
+    const seiten = new Map();
+    for (const z of liste) {
+      const k = z.seite.trim();
+      const s = seiten.get(k) || { name: k, alle: 0, unw: 0 };
+      s.alle += 1;
+      if (z.behandlung === "unwidersprochen") s.unw += 1;
+      seiten.set(k, s);
+    }
+    const max = Math.max(1, ...[...seiten.values()].map((s) => s.alle));
+    return [
+      el("div", { class: "gross" }, ZW_EINORDNUNG[zw.einschaetzung.einordnung] || zw.einschaetzung.einordnung),
+      el("div", { class: "klein" }, zw.einschaetzung.begruendung),
+      seiten.size > 0 && el("h3", {}, "Wertende Zitate je Seite"),
+      ...[...seiten.values()].sort((x, y) => y.alle - x.alle).map((s) => el("div", { class: "pos" },
+        el("div", { class: "pos-kopf" }, el("span", {}, s.name),
+          el("span", { class: "klein" }, `${s.alle}, davon ${s.unw} unwidersprochen`)),
+        el("div", { class: "pos-balken", style: `width:${Math.max(2, Math.round(100 * s.alle / max))}%` }))),
+      liste.length > 0 && el("h3", {}, "Zitate"),
+      liste.length > 0 && el("ul", { class: "liste" }, liste.map((z) => {
+        const da = opt.da ? opt.da(z.zitat) : true;
+        return el("li", { class: opt.zeigen ? "fund" + (da ? "" : " fehlt") : "", ...(opt.zeigen ? { onclick: () => da && opt.zeigen(z.zitat) } : {}) },
+          el("span", {}, da ? "" : "⚠ ", `„${z.zitat}“`,
+            el("span", { class: marke + (z.behandlung === "unwidersprochen" ? " unw" : "") }, ZW_BEHANDLUNG[z.behandlung] || z.behandlung),
+            el("div", { class: "klein" }, `${z.sprecher} · ${z.seite}. ${z.begruendung}`)));
+      })),
+      el("div", { class: "klein", style: "margin-top:6px" }, "Wertungen in Zitaten und O-Tönen gehören den Zitierten. Hier geht es darum, "
+        + "wessen Wertungen der Text aufnimmt und ob er sie stehen lässt („opportune Zeugen“). Zählt nicht in Teilwerten und Kennzahl."),
+    ];
+  }
+
   const ART = { bericht: "Bericht", interview: "Interview", schaltgespraech: "Schaltgespräch", kommentar: "Kommentar",
     meldung: "Meldung", sport: "Sport", wetter: "Wetter", sonstiges: "Sonstiges" };
 
@@ -532,5 +576,5 @@ globalThis.WA_GEMEINSAM = (() => {
     STUFEN, zeichen, normalisieren, kennzahlText, spiegelVergleich, stimmenZaehlen, metaText, el,
     zeilenLesen, textIndex, bereicheFinden, artikelDarstellen, wortleiterBlock, fundDarstellen,
     tagesschauVideos, untertitelLesen, transkriptText, redezeit, beitraegeBerechnen, beitraegeDarstellen,
-    youtubeAbschnitte, youtubeAbsaetze, youtubeText, absatzEtikett };
+    youtubeAbschnitte, youtubeAbsaetze, youtubeText, absatzEtikett, zitatwertungenDarstellen };
 })();

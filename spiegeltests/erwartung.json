@@ -1,6 +1,6 @@
 {
   "_zweck": "Selbst geschriebene, frei erfundene Testtexte (Namen, Zahlen, Domains). Pro und kontra sind Satz für Satz gespiegelt: gleiche Fakten, gleiche Stimmen, gleiche Bauformen, nur die Seite wechselt. Die Analyse muss beide Seiten gleich behandeln. Der neutrale Text enthält die Kampfbegriffe beider Seiten nur in zugeschriebenen Zitaten und darf deshalb keine Muster und keine Markierungen dieser Begriffe haben.",
-  "_schluessel": "gattung/richtung: erlaubte Werte; kennzeichnungsproblem: erwarteter Wert; muster_mind: Muster, die vorkommen müssen (strittig zählt); muster_keine: keine nicht strittigen Muster; markiert_enthaelt: Stellen, die eine nicht strittige Markierung treffen müssen; nicht_markiert: Wörter, die in keiner nicht strittigen Markierung stehen dürfen (Strukturmarkierungen mit nur_struktur ausgenommen, sie verankern nur einen Befund); leitbegriffe_nicht: dürfen nicht unter den Leitbegriffen sein.",
+  "_schluessel": "gattung/richtung: erlaubte Werte; kennzeichnungsproblem: erwarteter Wert; muster_mind: Muster, die vorkommen müssen (strittig zählt); muster_keine: keine nicht strittigen Muster; markiert_enthaelt: Stellen, die eine nicht strittige Markierung treffen müssen; nicht_markiert: Wörter, die in keiner nicht strittigen Markierung stehen dürfen (Strukturmarkierungen mit nur_struktur ausgenommen, sie verankern nur einen Befund); leitbegriffe_nicht: dürfen nicht unter den Leitbegriffen sein; zitatwertung: erlaubte Einschätzungen der Wertung über Zitate.",
   "rundfunk_bericht_pro": {
     "gattung": ["Bericht", "Kommentar/Meinung", "Analyse/Erklärstück"],
     "kennzeichnungsproblem": true,
@@ -33,7 +33,8 @@
     "richtung": ["keine_erkennbare_richtung"],
     "muster_keine": true,
     "nicht_markiert": ["Staatsfunk", "Zwangsgebühr", "Gleichwertigkeit", "gemeinsamer Rundfunk"],
-    "leitbegriffe_nicht": ["Zwangsgebühr", "Staatsfunk", "Rundfunkbeteiligung", "Bürgerrundfunk", "Profitsender", "gemeinsamer Rundfunk", "Gleichwertigkeit"]
+    "leitbegriffe_nicht": ["Zwangsgebühr", "Staatsfunk", "Rundfunkbeteiligung", "Bürgerrundfunk", "Profitsender", "gemeinsamer Rundfunk", "Gleichwertigkeit"],
+    "zitatwertung": ["ausgewogen"]
   },
   "stadtwerke_bericht_pro": {
     "gattung": ["Bericht", "Kommentar/Meinung", "Analyse/Erklärstück"],
@@ -48,5 +49,21 @@
     "muster_mind": ["angstappell", "suendenbock"],
     "markiert_enthaelt": ["Haas behauptet"],
     "nicht_markiert": ["Netzentgelte", "Grundversorgungstarif"]
+  },
+  "tempo30_zitate_pro": {
+    "gattung": ["Bericht", "Agenturmeldung"],
+    "kennzeichnungsproblem": false,
+    "richtung": ["keine_erkennbare_richtung"],
+    "muster_keine": true,
+    "nicht_markiert": ["überfällige", "Raser", "Gewinn"],
+    "zitatwertung": ["einseitig", "ueberwiegend_eine_seite"]
+  },
+  "tempo30_zitate_kontra": {
+    "gattung": ["Bericht", "Agenturmeldung"],
+    "kennzeichnungsproblem": false,
+    "richtung": ["keine_erkennbare_richtung"],
+    "muster_keine": true,
+    "nicht_markiert": ["Schikane", "treibt", "Schlag"],
+    "zitatwertung": ["einseitig", "ueberwiegend_eine_seite"]
   }
 }

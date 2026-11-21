@@ -68,7 +68,8 @@ Leerraum und Groß/Klein – dieselbe Regel nutzt das Addon), Zitate über zehn 
 Richtungsbelege ohne Markierung, Teilwerte ohne Markierung und umgekehrt. Für die strategischen Muster außerdem:
 Belege, die nicht im Artikel stehen oder über zehn Wörter haben, Muster ohne Beleg, mehr als acht Leitbegriffe.
 Für das Stimmenverzeichnis: erstes Vorkommen nicht im Artikel oder über zehn Wörter, Stimmen ohne Aussage,
-mehr zugeschriebene Aussagen als Sätze, mehr als fünf Akteure ohne Stimme; bei Fernsehtranskripten O-Ton-Absätze,
+mehr zugeschriebene Aussagen als Sätze, mehr als fünf Akteure ohne Stimme; Zitate der Wertung über Zitate, die nicht
+im Artikel stehen oder über zehn Wörter haben; bei Fernsehtranskripten O-Ton-Absätze,
 die es im Text nicht gibt oder die mehreren Stimmen zugeordnet sind.
 Für Wirkung und Wortleiter: leere Wirkung, Wortleitern mit weniger als drei oder mehr als sieben Stufen oder
 Stellen außerhalb der Reihe, nicht strittige Markierungen, bei denen das gewählte Wort zugleich das neutrale ist,
@@ -92,6 +93,23 @@ Dazu bis zu fünf Akteure, die der Text als beschuldigt, betroffen oder entschei
 kommen, mit Vermerk, ob laut Text eine Stellungnahme angefragt oder abgelehnt wurde. Nur textintern: Wer im Text
 nicht vorkommt, gilt nicht als fehlend. `uebersicht.md` zeigt das kurz als `7/21, 2 Pos., 1 ohne`
 (Stimmen/Aussagen, Positionen außer „ohne Position“, Akteure ohne Stimme).
+
+### Wertung über Zitate
+
+Zitierte Wertungen Dritter sind keine Wertung des Textes und gehen nicht in die Teilwerte ein. Ein Text kann aber
+über Zitate werten: Er nimmt die wertenden Aussagen einer Seite auf und lässt sie stehen, ohne nachzufragen,
+einzuordnen oder die andere Seite antworten zu lassen (Hagens „opportune Zeugen“, siehe `LITERATUR.md`). Die eigene
+Stimme bleibt dabei sachlich, Teilwerte und Richtung blieben niedrig. Deshalb gibt es dafür einen eigenen Abschnitt
+(Schritt 6b im Prompt, Feld `zitatwertungen`), getrennt von Teilwerten und Kennzahl:
+- bis zu zwölf wertende Zitate oder O-Töne (im Interview die Antworten des Gastes) mit Sprecher, der Seite, der die
+  Wertung nützt (Wortlaut wie im Stimmenverzeichnis), und der Behandlung im Text: `unwidersprochen`, `nachgefragt`,
+  `widersprochen`, `eingeordnet` oder `gegenstimme`;
+- eine Einschätzung: `keine_wertenden_zitate`, `ausgewogen`, `ueberwiegend_eine_seite` oder `einseitig`.
+
+Leiste und Bericht zeigen die Einschätzung, die wertenden Zitate je Seite (davon unwidersprochen) und die Zitate
+selbst; Klick springt zur Stelle. `uebersicht.md` hängt an die Stimmen-Spalte z. B. `Z: einseitig 3/3 unw.` an.
+Spiegelprobe und Spiegelpaare vergleichen die Einschätzung mit. Ob eine zitierte Wertung zutrifft, prüft die
+Analyse nicht.
 
 ### Strategische Muster
 
@@ -205,12 +223,13 @@ Rundfunkbeitrags sind frei erfunden: Namen, Zahlen, Domains (`.example`).
 | `rundfunk_kommentar_pro` / `_kontra` | gekennzeichneter Kommentar derselben Quelle, dieselben Leitbegriffe wie der Bericht |
 | `rundfunk_neutral` | Kontrolle: dieselben Fakten, die Kampfbegriffe beider Seiten nur in zugeschriebenen Zitaten |
 | `stadtwerke_bericht_pro` / `_kontra` | Verkauf von Anteilen der (erfundenen) Stadtwerke Lindenau, als Lokalbericht aufgemacht; nur Angstappell und Sündenbock, sonst keine Muster. Gespiegelt: Bedrohung durch Scheitern bzw. Gelingen des Verkaufs, Schuld bei „Gewerkschaftsfunktionären“ bzw. „Rathausbürokraten“. Der Text nennt selbst andere Ursachen des Verlusts (Gutachten), das macht die Schuldzuweisung zum Sündenbock |
+| `tempo30_zitate_pro` / `_kontra` | Tempo 30 in der (erfundenen) Stadt Lindenau, Lokalbericht mit durchgehend sachlicher eigener Stimme; nur eine Seite wird wertend zitiert (drei Zitate, unwidersprochen), die andere nur mit einer Sachangabe. Gespiegelt: Befürworter bzw. Gegner werten. Erwartet: keine Muster, keine Markierung der zitierten Wertungen, Wertung über Zitate `einseitig` oder `ueberwiegend_eine_seite`; der neutrale Rundfunktext soll `ausgewogen` ergeben |
 
 ```powershell
 .venv\Scripts\python wertung.py --ordner spiegeltests --ergebnisse ergebnisse\spiegel
 ```
 
-Sieben Artikel × zwei Läufe = 14 API-Aufrufe (vorhandene Läufe werden nicht neu bezahlt, `--nur stadtwerke`
+Neun Artikel × zwei Läufe = 18 API-Aufrufe (vorhandene Läufe werden nicht neu bezahlt, `--nur tempo30`
 analysiert nur das neue Paar). `uebersicht.md` hat dann drei zusätzliche Abschnitte:
 - **Spiegelpaare:** `<stamm>_pro` gegen `<stamm>_kontra`. Die Teilwerte werden über alle Läufe gemittelt.
   Symmetrisch heißt: keine Dimension weicht um mehr als 1 ab, gleiche nicht strittige Muster (in mindestens der Hälfte der

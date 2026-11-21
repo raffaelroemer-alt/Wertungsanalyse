@@ -116,6 +116,8 @@ Die Menge sagt nicht, wem die Wertung nützt. Leite die Richtung nur aus den mar
 
 In `belege` stehen die Zitate der Markierungen, auf die du dich stützt (wörtlich wie in den Markierungen). Bei `keine_erkennbare_richtung` darf `belege` leer sein.
 
+Die Richtung beschreibt die Wertung in der Stimme des Textes. Strukturmarkierungen (`nur_struktur`) allein, etwa eine einseitige Auswahl von Zitaten, begründen keine Parteinahme: Welche Seite die zitierten Wertungen begünstigen, steht in Schritt 6b und wird hier nicht doppelt gezählt. Parteinahme setzt mindestens eine nicht strittige Markierung voraus, die nicht nur strukturell ist.
+
 ## Schritt 5: Strategische Muster
 
 Unabhängig von den Markierungen prüfst du den ganzen Text auf Bauformen gezielter Überzeugungskommunikation, wie sie Leitfäden für strategisches Framing empfehlen. **Das ist keine Aussage über Absicht.** Du stellst fest, dass der Text so gebaut ist, nicht dass jemand es so wollte; schreibe die Begründung entsprechend („Der Text …“, nie „Die Redaktion will …“). Muster zählen weder in den Teilwerten noch in der Kennzahl. In den meisten Nachrichtentexten findest du keines; eine leere Liste ist der Normalfall. Für alle Akteure und Positionen gelten dieselben Maßstäbe: Eine aufwertende Neuprägung ist genauso ein Muster wie ein abwertender Kampfbegriff.
@@ -164,6 +166,19 @@ Felder je Stimme (`liste`, in der Reihenfolge des ersten Auftretens):
 - `vermerk`: `angefragt_ohne_antwort`, wenn der Text sagt, dass eine Stellungnahme angefragt wurde, aber nicht kam („war nicht zu erreichen“); `aeusserung_abgelehnt`, wenn der Akteur sich laut Text nicht äußern wollte; sonst `kein_vermerk`.
 
 Bei `kein_artikel` und `nur_zusammenfassung` bleiben `liste` und `ohne_stimme` leer.
+
+## Schritt 6b: Wertung über Zitate
+
+Zitierte Wertungen Dritter sind keine Wertung des Textes (Schritt 2). Ein Text kann aber über Zitate werten: Er lässt wertende Aussagen einer Seite stehen, ohne nachzufragen, einzuordnen oder die andere Seite antworten zu lassen („opportune Zeugen“). Das erfasst du hier, getrennt von Markierungen, Teilwerten und Kennzahl. Es beschreibt den Bau des Textes, nicht eine Absicht.
+
+**Wertendes Zitat:** eine wörtlich oder indirekt zugeschriebene Aussage einer Stimme (auch ein O-Ton, im Interview eine Antwort des Gastes), die ein Urteil über Personen, Gruppen, Maßnahmen oder Positionen der Streitfrage enthält: Lob, Kritik, Etikett („Meisterleistung“, „Abzocke“, „verantwortungslos“), Motivunterstellung, dramatisierende Prognose. Reine Sachangaben, Zahlen und Ankündigungen sind keine wertenden Zitate. Höchstens zwölf, die gewichtigsten zuerst. Felder `liste`:
+- `zitat`: Zitat nach den Zitatregeln, der wertende Teil der Aussage.
+- `sprecher`: wie im Stimmenverzeichnis.
+- `seite`: die Position, der die Wertung nützt, im selben Wortlaut wie `position` im Stimmenverzeichnis („für die Kürzung“); dient sie keiner Seite der Streitfrage, `ohne Position`.
+- `behandlung`: `unwidersprochen` (der Text lässt die Wertung ohne Nachfrage, Einordnung oder Antwort stehen), `nachgefragt` (Moderation oder Text fragt kritisch nach), `widersprochen` (der Text hält Fakten dagegen), `eingeordnet` (der Text liefert Zusammenhang oder Quelle, der die Wertung relativiert), `gegenstimme` (eine andere Stimme antwortet im Text auf diesen Punkt).
+- `begruendung`: kurz, was gewertet wird und warum die Behandlung so ist.
+
+`einschaetzung`: `keine_wertenden_zitate`; `ausgewogen` (wertende Zitate mehrerer Seiten in vergleichbarem Umfang oder überwiegend nachgefragt, eingeordnet oder beantwortet); `ueberwiegend_eine_seite` (die meisten unwidersprochenen wertenden Zitate nützen einer Seite); `einseitig` (fast nur eine Seite wertet, und das steht unwidersprochen; die andere Seite kommt nicht oder nur mit Sachangaben vor). Dazu `begruendung` mit den Zahlen je Seite. Beurteile nur, was im Text steht: Ob eine Wertung zutrifft, prüfst du nicht.
 
 ## Schritt 7: Kennzahl
 

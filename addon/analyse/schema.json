@@ -1,7 +1,7 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["textlage", "gattung", "kennzeichnungsproblem", "markierungen", "teilwerte", "richtung", "strategische_muster", "stimmen", "beitraege", "kennzahl", "neutrale_fassung", "hinweise"],
+  "required": ["textlage", "gattung", "kennzeichnungsproblem", "markierungen", "teilwerte", "richtung", "strategische_muster", "stimmen", "zitatwertungen", "beitraege", "kennzahl", "neutrale_fassung", "hinweise"],
   "properties": {
     "textlage": {
       "type": "string",
@@ -135,6 +135,37 @@
               "rolle": {"type": "string"},
               "vermerk": {"type": "string", "enum": ["kein_vermerk", "angefragt_ohne_antwort", "aeusserung_abgelehnt"]}
             }
+          }
+        }
+      }
+    },
+    "zitatwertungen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["liste", "einschaetzung"],
+      "properties": {
+        "liste": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["zitat", "sprecher", "seite", "behandlung", "begruendung"],
+            "properties": {
+              "zitat": {"type": "string", "description": "zeichengenau aus dem Text, der wertende Teil, höchstens zehn Wörter"},
+              "sprecher": {"type": "string"},
+              "seite": {"type": "string", "description": "Position, der die Wertung nützt, gleicher Wortlaut wie im Stimmenverzeichnis"},
+              "behandlung": {"type": "string", "enum": ["unwidersprochen", "nachgefragt", "widersprochen", "eingeordnet", "gegenstimme"]},
+              "begruendung": {"type": "string"}
+            }
+          }
+        },
+        "einschaetzung": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["einordnung", "begruendung"],
+          "properties": {
+            "einordnung": {"type": "string", "enum": ["keine_wertenden_zitate", "ausgewogen", "ueberwiegend_eine_seite", "einseitig"]},
+            "begruendung": {"type": "string"}
           }
         }
       }

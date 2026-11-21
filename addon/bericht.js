@@ -3,7 +3,8 @@
 (() => {
   const { DIM, MUSTER, STIMMEN_TYP, VERMERK, RICHTUNG, TEXTLAGE, GATTUNG_KOMMENTAR, STUFEN,
     kennzahlText, spiegelVergleich, stimmenZaehlen, metaText, el, zeilenLesen, textIndex, bereicheFinden,
-    artikelDarstellen, fundDarstellen, redezeit, beitraegeBerechnen, beitraegeDarstellen, absatzEtikett } = globalThis.WA_GEMEINSAM;
+    artikelDarstellen, fundDarstellen, redezeit, beitraegeBerechnen, beitraegeDarstellen, absatzEtikett,
+    zitatwertungenDarstellen } = globalThis.WA_GEMEINSAM;
   const $ = (id) => document.getElementById(id);
 
   $("drucken").addEventListener("click", () => window.print());
@@ -110,6 +111,12 @@
 
     // Wer kommt zu Wort
     if (a.stimmen) teile.push(...stimmenTeil(a.stimmen, rz));
+
+    // Wertung über Zitate
+    if (a.zitatwertungen) {
+      teile.push(el("h2", {}, `Wertung über Zitate (${a.zitatwertungen.liste.length})`),
+        ...zitatwertungenDarstellen(a.zitatwertungen, { marke: "etikett" }));
+    }
 
     // Spiegelprobe mit Gegenfassung (abwählbar)
     if (daten.spiegel) teile.push(...spiegelTeil(a, daten.spiegel));

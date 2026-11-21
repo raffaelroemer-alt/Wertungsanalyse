@@ -159,6 +159,10 @@ def pruefen(analyse: dict, artikeltext: str) -> dict:
         "stimmen_ohne_aussage": [x["sprecher"] for x in st["liste"] if x["aussagen"] < 1],
         "stimmen_aussagen_ueber_gesamt": sum(x["aussagen"] for x in st["liste"]) > k["gesamt"] > 0,
         "ohne_stimme_zu_viele": len(st["ohne_stimme"]) > MAX_OHNE_STIMME,
+        "zitatwertungen_nicht_gefunden": [z["zitat"] for z in (analyse.get("zitatwertungen") or {}).get("liste", [])
+                                          if not normalisieren(z["zitat"]) or normalisieren(z["zitat"]) not in norm],
+        "zitatwertungen_zu_lang": [z["zitat"] for z in (analyse.get("zitatwertungen") or {}).get("liste", [])
+                                   if len(z["zitat"].split()) > 10],
         "beitraege_beginn_nicht_gefunden": [b["beginn"] for b in analyse.get("beitraege") or []
                                             if not normalisieren(b["beginn"]) or normalisieren(b["beginn"]) not in norm],
         "beitraege_beginn_zu_lang": [b["beginn"] for b in analyse.get("beitraege") or [] if len(b["beginn"].split()) > 10],
@@ -190,7 +194,8 @@ def stimmen_von(analyse: dict) -> dict:
 
 
 def stimmen_text(analyse: dict) -> str:
-    """Kurzform wie '7/21, 2 Pos., 1 ohne': Stimmen/Aussagen, Positionen außer 'ohne Position', Akteure ohne Stimme.
+    """Kurzform wie '7/21, 2 Pos., 1 ohne, Z: einseitig 4/5 unw.': Stimmen/Aussagen, Positionen außer 'ohne Position',
+    Akteure ohne Stimme, Wertung über Zitate (Einschätzung, unwidersprochene/alle wertenden Zitate).
 
     '?' = ältere Analyse ohne Verzeichnis.
     """
@@ -205,6 +210,13 @@ def stimmen_text(analyse: dict) -> str:
         teile.append(f"{len(positionen)} Pos.")
     if st["ohne_stimme"]:
         teile.append(f"{len(st['ohne_stimme'])} ohne")
+    # Wertung über Zitate: Einschätzung und Anteil unwidersprochener wertender Zitate, z. B. "Z: einseitig 4/5 unw."
+    zw = analyse.get("zitatwertungen")
+    if zw:
+        kurz = {"keine_wertenden_zitate": "keine", "ausgewogen": "ausgewogen",
+                "ueberwiegend_eine_seite": "überwiegend", "einseitig": "einseitig"}[zw["einschaetzung"]["einordnung"]]
+        unw = sum(z["behandlung"] == "unwidersprochen" for z in zw["liste"])
+        teile.append(f"Z: {kurz}" + (f" {unw}/{len(zw['liste'])} unw." if zw["liste"] else ""))
     return ", ".join(teile)
 
 
@@ -557,6 +569,12 @@ def erwartung_abweichungen(a: dict, e: dict) -> list[str]:
         f += [f"Muster {MUSTER_KURZ[m['art']]} gefunden" for m in sm["muster"] if not m["strittig"]]
     leit = {normalisieren(x) for x in sm["leitbegriffe"]}
     f += [f"Leitbegriff {x}" for x in e.get("leitbegriffe_nicht", []) if normalisieren(x) in leit]
+    if "zitatwertung" in e:
+        zw = a.get("zitatwertungen")
+        if not zw:
+            f.append("Analyse ohne Zitatwertungen (ältere Version)")
+        elif zw["einschaetzung"]["einordnung"] not in e["zitatwertung"]:
+            f.append(f"Zitatwertung {zw['einschaetzung']['einordnung']}")
     return f
 
 
@@ -598,7 +616,7 @@ def symmetrie(a: list[dict], b: list[dict]) -> dict:
     """Vergleicht zwei Gruppen von Läufen (pro/kontra oder Original/Gegenfassung).
 
     Teilwerte gemittelt; abweichend ist eine Dimension mit mehr als 1 Unterschied, ungleiche nicht strittige
-    Muster (Mehrheit der Läufe) und ungleiches Kennzeichnungsproblem. Muster, die nur strittig vorkommen,
+    Muster (Mehrheit der Läufe), ungleiches Kennzeichnungsproblem und ungleiche Wertung über Zitate. Muster, die nur strittig vorkommen,
     werden in der Zelle ausgewiesen, entscheiden aber nicht.
     """
     zellen, abweichend = [], []
@@ -621,7 +639,19 @@ def symmetrie(a: list[dict], b: list[dict]) -> dict:
     kennz = ("ja" if ka else "nein") if ka == kb else f"{'ja' if ka else 'nein'} / {'ja' if kb else 'nein'}"
     if ka != kb:
         abweichend.append("Kennz.")
+    # Wertung über Zitate: häufigste Einschätzung je Seite (nur wenn alle Läufe sie haben)
+    za, zb = _zitat_mehrheit(a), _zitat_mehrheit(b)
+    if za and zb and za != zb:
+        abweichend.append(f"Zitate ({za} / {zb})")
     return {"zellen": zellen, "muster": muster, "kennz": kennz, "abweichend": abweichend}
+
+
+def _zitat_mehrheit(laeufe: list[dict]) -> str | None:
+    """Häufigste Einschätzung der Wertung über Zitate; None, wenn ein Lauf sie nicht hat (ältere Analyse)."""
+    werte = [(l["analyse"].get("zitatwertungen") or {}).get("einschaetzung", {}).get("einordnung") for l in laeufe]
+    if not werte or None in werte:
+        return None
+    return max(set(werte), key=werte.count)
 
 
 def spiegelpaare(alle: dict[str, list[dict]]) -> list[str]:
