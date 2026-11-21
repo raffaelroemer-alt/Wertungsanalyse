@@ -349,3 +349,8 @@ Geprüft (19.11.2026, im Browser mit nachgebauter Chrome-Schnittstelle und gespe
 Textauszug, alle 35 Fundstellen dreier Testartikel gefunden und markiert, Seitenleiste, Hinweis beim Überfahren,
 Schalter, Sprung zur Fundstelle, „kein Artikel“, „nicht gefunden“, Stream-Leser mit zerstückelter Antwort,
 Fehlermeldungen, Einstellungsseite. Nicht geprüft: das Laden in Chrome selbst und ein echter API-Aufruf aus dem Addon.
+
+## Lizenz
+
+MIT, siehe [LICENSE](LICENSE). Ausgenommen ist `addon/lib/Readability.js` (Mozilla, Apache-Lizenz 2.0,
+siehe `addon/lib/LICENSE-Readability.md`).
