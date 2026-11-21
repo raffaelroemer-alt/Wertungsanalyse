@@ -40,8 +40,17 @@ def laden(url):
         return antwort.read().decode("utf-8")
 
 
-def videos(seite):
-    """Alle Videos der Seite mit deutschen Untertiteln (EBU-TT): Titel, Dauer, Untertitel-Adresse, Datum."""
+def themen_liste(synopsis):
+    """Themenliste einer Sendung (meta.synopsis); getrennt nur an Kommas vor einem neuen Thema (wie gemeinsam.js)."""
+    t = re.sub(r"^\s*Themen der Sendung:\s*", "", synopsis or "", flags=re.I).strip()
+    if "," not in t:
+        return []
+    return [x.strip() for x in re.split(r',\s+(?=[A-ZÄÖÜ0-9#„"»])', t) if x.strip()]
+
+
+def videos(seite, ohne_untertitel=None):
+    """Alle Videos der Seite mit deutschen Untertiteln (EBU-TT): Titel, Dauer, Untertitel-Adresse, Datum, Themen.
+    Titel von Videos ohne Untertitel kommen in die Liste ohne_untertitel, falls angegeben."""
     gefunden, gesehen = [], set()
     for roh in re.findall(r'data-v="([^"]*)"', seite):
         try:
@@ -51,14 +60,19 @@ def videos(seite):
         mc = daten.get("mc") or {}
         quellen = [q["url"] for u in mc.get("subtitles") or [] if u.get("languageCode") == "de"
                    for q in u.get("sources") or [] if q.get("kind") == "ebutt" and q.get("url")]
-        if not quellen or quellen[0] in gesehen:
+        if not quellen:
+            if ohne_untertitel is not None and (mc.get("meta") or {}).get("title"):
+                ohne_untertitel.append(mc["meta"]["title"])
+            continue
+        if quellen[0] in gesehen:
             continue
         gesehen.add(quellen[0])
         meta = mc.get("meta") or {}
         clip = (((mc.get("pluginData") or {}).get("trackingAgf@all") or {}).get("clipData") or {}).get("title", "")
         datum = re.search(r"(\d{4})\.(\d{2})\.(\d{2})", clip)
         gefunden.append({"titel": meta.get("title") or "ohne Titel", "dauer_s": meta.get("durationSeconds"),
-                         "untertitel": quellen[0], "datum": "".join(datum.groups()) if datum else None})
+                         "untertitel": quellen[0], "datum": "".join(datum.groups()) if datum else None,
+                         "themen": themen_liste(meta.get("synopsis"))})
     return gefunden
 
 
@@ -133,9 +147,14 @@ def main():
     if not re.match(r"https://(www\.)?tagesschau\.de/", args.adresse):
         sys.exit("Bitte eine Adresse auf https://www.tagesschau.de/ angeben.")
 
-    liste = videos(laden(args.adresse))
+    ohne = []
+    liste = videos(laden(args.adresse), ohne)
     if not liste:
-        sys.exit("Auf der Seite wurden keine Videos mit Untertiteln gefunden.")
+        sys.exit("Auf der Seite wurden keine Videos mit Untertiteln gefunden."
+                 + (f" Ohne Untertitel: {'; '.join(ohne)}. Ihr Text steckt meist in der ganzen Sendung "
+                    "(tagesschau 20 Uhr oder tagesthemen)." if ohne else ""))
+    if ohne:
+        print(f"ohne Untertitel, übersprungen: {'; '.join(ohne)}")
     ordner = Path(args.ordner)
     ordner.mkdir(exist_ok=True)
 
@@ -159,7 +178,8 @@ def main():
         quelle = (f"Quelle: tagesschau.de, Video „{v['titel']}“ vom {datum}. Text aus den "
                   + ("Live-Untertiteln (können gekürzt oder umformuliert sein)" if live else "Untertiteln")
                   + ". Fernsehbeitrag: Jeder Absatz [Absatz N] ist ein Sprecherwechsel (an der Untertitelfarbe "
-                  "erkannt); Bilder, Grafiken und Namenseinblendungen fehlen.")
+                  "erkannt); Bilder, Grafiken und Namenseinblendungen fehlen."
+                  + (f" Themen der Sendung laut tagesschau.de: {'; '.join(v['themen'])}." if len(v["themen"]) > 1 else ""))
         ziel.write_text("\n".join([f"URL: {args.adresse}", quelle, v["titel"],
                                    *[f"[Absatz {t['nr']}] {t['text']}" for t in teile]]) + "\n", encoding="utf-8")
 

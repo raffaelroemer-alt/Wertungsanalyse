@@ -3,7 +3,7 @@
 (() => {
   const { DIM, MUSTER, STIMMEN_TYP, VERMERK, RICHTUNG, TEXTLAGE, GATTUNG_KOMMENTAR, STUFEN,
     kennzahlText, spiegelVergleich, stimmenZaehlen, metaText, el, zeilenLesen, textIndex, bereicheFinden,
-    artikelDarstellen, fundDarstellen, redezeit } = globalThis.WA_GEMEINSAM;
+    artikelDarstellen, fundDarstellen, redezeit, beitraegeBerechnen, beitraegeDarstellen, absatzEtikett } = globalThis.WA_GEMEINSAM;
   const $ = (id) => document.getElementById(id);
 
   $("drucken").addEventListener("click", () => window.print());
@@ -32,12 +32,14 @@
 
   function berichtZeigen(daten) {
     const a = daten.ergebnis.analyse;
-    const zeilen = zeilenLesen(daten.text);
+    const tv = daten.ergebnis.tv || null;
+    const basis = zeilenLesen(daten.text);
+    const bt = tv ? beitraegeBerechnen(basis, a, tv) : null; // ganze Sendung: Trennköpfe und Werte je Beitrag
+    const zeilen = bt ? bt.zeilen : basis;
     const titel = zeilen.find((z) => z.art === "Überschrift")?.text || daten.titel || "Artikel";
     document.title = `Wertungsanalyse – ${titel}`;
     const index = textIndex(zeilen);
     const karte = bereicheFinden(index, a.markierungen);
-    const tv = daten.ergebnis.tv || null;
     const rz = redezeit(a.stimmen, tv);
     const teile = [];
 
@@ -46,8 +48,11 @@
       el("div", { class: "marke-oben" }, "Wertungsanalyse"),
       el("h1", {}, titel),
       el("div", { class: "url" }, daten.url),
-      tv && el("div", { class: "meta" }, `Fernsehbeitrag, ${minuten(tv.absaetze.length ? tv.absaetze[tv.absaetze.length - 1].ende : 0)} min. Text aus den `
-        + (tv.live ? "Live-Untertiteln" : "Untertiteln") + "; Bilder, Einblendungen und Tonfall sind nicht berücksichtigt."),
+      tv && el("div", { class: "meta" }, tv.quelle === "youtube"
+        ? `YouTube-Video${tv.kanal ? ` (${tv.kanal})` : ""}, ${minuten(tv.absaetze.length ? tv.absaetze[tv.absaetze.length - 1].ende : 0)} min. `
+          + "Text aus dem YouTube-Transkript (meist automatisch erzeugt, ohne Sprecherwechsel); Bilder und Tonfall sind nicht berücksichtigt."
+        : `Fernsehbeitrag, ${minuten(tv.absaetze.length ? tv.absaetze[tv.absaetze.length - 1].ende : 0)} min. Text aus den `
+          + (tv.live ? "Live-Untertiteln" : "Untertiteln") + "; Bilder, Einblendungen und Tonfall sind nicht berücksichtigt."),
       el("div", { class: "meta" }, metaText(daten.ergebnis.meta))));
 
     // Überblick
@@ -69,6 +74,14 @@
       teile.push(el("div", { class: "warn" }, el("b", {}, "Kennzeichnungsproblem: "), a.kennzeichnungsproblem.begruendung));
     }
     if (TEXTLAGE[a.textlage]) teile.push(el("div", { class: "warn" }, TEXTLAGE[a.textlage]));
+
+    // Beiträge einer ganzen Sendung
+    if (bt) {
+      teile.push(el("h2", {}, `Beiträge der Sendung (${bt.liste.length})`),
+        el("p", { class: "klein" }, "Sendezeit aus den Untertitelzeiten, Werte je Beitrag aus der Analyse "
+          + "(W Wortwahl, E Rahmung, Q Quellen, A Auswahl, Ü Überschrift/Anmoderation, 0–4). Die Gesamtwerte unten gelten für die ganze Sendung."),
+        el("div", { class: "beitraege" }, beitraegeDarstellen(bt.liste)));
+    }
 
     // Teilwerte
     teile.push(el("h2", {}, "Teilwerte (0–4)"),
@@ -109,7 +122,7 @@
         el("div", { class: "legende" }, Object.entries(DIM).map(([schl, d]) =>
           el("span", {}, el("span", { class: `wa d-${schl}` }, d.name))),
           el("span", {}, "gestrichelt = strittig · gepunktet = nur strukturell · Ziffer = Nummer der Fundstelle"))),
-      el("div", { class: "artikel" }, artikelDarstellen(zeilen, index, karte, a.markierungen, (z) => absatzEtikett(z, rz)))));
+      el("div", { class: "artikel" }, artikelDarstellen(zeilen, index, karte, a.markierungen, (z) => absatzEtikett(z, rz, tv)))));
 
     // Fundstellen
     teile.push(el("section", {}, el("h2", {}, `Fundstellen (${a.markierungen.length})`),
@@ -138,13 +151,6 @@
   }
 
   const minuten = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
-
-  // Absatz eines Transkripts: O-Ton mit Sprecher (aus der Analyse) oder Sprechertext
-  function absatzEtikett(z, rz) {
-    const sprecher = rz && rz.absatzStimme.get(z.nr);
-    if (!sprecher) return { text: `${z.nr} · Sprechertext`, oton: false };
-    return { text: `${z.nr} · ${/O-Ton/i.test(sprecher) ? sprecher : "O-Ton " + sprecher}`, oton: true };
-  }
 
   // Redezeit im O-Ton nach Position und Anteil des Sprechertexts (nur Fernsehbeiträge)
   function redezeitTeil(rz) {

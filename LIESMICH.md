@@ -144,6 +144,35 @@ je Absatz beschriftet („O-Ton …“ oder „Sprechertext“), darunter die Fu
 Musterbelege und Stimmen springen ins Transkript. „Wer kommt zu Wort“ zeigt zusätzlich die Redezeit, ebenso der
 PDF-Bericht.
 
+**Videos ohne Untertitel.** Untertitel haben auf tagesschau.de die ganzen Sendungen (tagesschau 20 Uhr, tagesthemen)
+und die aus der 20-Uhr-Sendung geschnittenen Beiträge, meist aber nicht Interviews, eigene Tagesthemen-Stücke,
+„tagesschau in 100 Sekunden“ oder das Wetter (Player-Daten: `subtitles: null`). Die Auswahl zeigt solche Videos
+ausgegraut mit Sendedatum und verweist auf die ganze Sendung desselben Tages, in der ihr Text meist steckt.
+
+**Ganze Sendung, Beiträge.** Der Player-Datensatz einer Sendung nennt ihre Themen (`meta.synopsis`); sie stehen im
+Transkript in der Zeile `Quelle:`. Die Analyse gliedert eine ganze Sendung zusätzlich in `beitraege`: Thema, Art
+(Bericht, Interview, Schaltgespräch, Kommentar, Meldung, Sport, Wetter), die ersten Wörter als wörtliches Zitat und
+je Beitrag Teilwerte, Kennzahl, Richtung und einen Kurzbefund. Das Addon merkt sich jede Untertitelzeile mit Zeit und
+Stelle im Absatz; damit findet es die Grenze auch mitten in einem Absatz (Moderation und Sprechertext sind beide weiß)
+und errechnet die Sendezeit je Beitrag. O-Töne zählen zu dem Beitrag, in dem ihr Absatz beginnt. Leiste und Bericht
+zeigen eine Übersicht der Beiträge (Klick springt hin) und Trennköpfe im Transkript. Die Gesamtwerte gelten weiter
+für die ganze Sendung; Kennzahl und Satzzählung einer ganzen Sendung schwanken zwischen Läufen stärker.
+
+**YouTube.** Viele Sender stellen Beiträge, Interviews und ganze Sendungen auch auf YouTube ein, auch solche, die auf
+tagesschau.de keine Untertitel haben (das Wadephul-Interview der tagesthemen vom 19.11.2026 etwa). Auf
+`youtube.com/watch` zeigt die Leiste „Transkript einlesen und analysieren“. Sie öffnet dazu „Transkript anzeigen“
+unter dem Video (klappt die Beschreibung auf und klickt die sichtbare Schaltfläche, so wie man es von Hand täte) und
+liest die Abschnitte mit Zeitmarken aus der Seite. Sie ruft keine YouTube-Schnittstelle selbst auf: Die
+Untertiteldateien gibt YouTube nur an den eigenen Player heraus, und darum herum wird nicht gearbeitet.
+Die Abschnitte (je etwa 8 s, oft mitten im Satz) werden zu Absätzen von 20–45 s an Satzenden zusammengefasst; die
+Zeile `Quelle:` sagt, dass die Absätze **Zeitabschnitte und keine Sprecherwechsel** sind und das Transkript meist
+automatisch erzeugt ist. Der Prompt wertet dann keine Hörfehler (falsch erkannte Namen), erkennt Sprecher nur am
+Inhalt, behandelt im Interview die Fragen als Stimme der Sendung und lässt `absaetze` leer; eine Redezeit je Stimme
+gibt es deshalb nicht. Gliederung in Beiträge und Sendezeit funktionieren weiter. Geräuschangaben in eckigen
+Klammern fallen weg. Klappt das Öffnen nicht, bittet die Leiste, „Transkript anzeigen“ von Hand zu wählen. Weil YouTube
+Videos ohne Neuladen wechselt, startet ein erneuter Klick aufs Symbol nach einem Videowechsel die Leiste neu.
+Das Gerüst der Leiste wird ohne `innerHTML` aufgebaut (YouTube erzwingt Trusted Types).
+
 **Kommandozeile.**
 
 ```powershell
@@ -158,12 +187,12 @@ bleiben, `--neu` überschreibt.
 Grenzen:
 - Live-Untertitel können gekürzt oder umformuliert sein. Für die Wortwahl zählt, ob sie wörtlich sind:
   stichprobenartig mit dem Ton vergleichen.
-- In der ganzen Sendung sprechen Moderation und Beitragstext beide weiß und laufen über Themengrenzen in einem
-  Absatz zusammen; die Sendung wird nicht in Beiträge geteilt. Einzelbeiträge sind die bessere Einheit.
+- In der ganzen Sendung sprechen Moderation und Beitragstext beide weiß; die Grenzen der Beiträge setzt die Analyse
+  aus dem Inhalt und der Themenliste, gemessen sind nur die Zeiten.
 - Namen stehen nur im Bild; die Analyse erschließt sie aus dem Text oder nennt die Rolle.
 - Bilder, Grafiken, Einblendungen, Tonfall und Musik fehlen ganz.
-- Erprobt mit blinden Subagenten an der 20-Uhr-Sendung vom 20.11.2026 (zwei Einzelbeiträge, eine ganze Sendung),
-  noch nicht mit der API.
+- Erprobt mit blinden Subagenten an der 20-Uhr-Sendung vom 20.11.2026 und mit der API (ganze Sendung, effort low
+  und high: high fand mehr belastbare Befunde und trennte die Positionen je Thema, ca. 0,53 $ statt 0,20 $).
 
 ### Spiegeltests
 

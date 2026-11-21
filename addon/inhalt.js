@@ -7,7 +7,8 @@
   const { DIM, MUSTER, STIMMEN_TYP, VERMERK, RICHTUNG, TEXTLAGE, GATTUNG_KOMMENTAR, STUFEN,
     zeichen, normalisieren, kennzahlText, spiegelVergleich, stimmenZaehlen, metaText, el,
     zeilenLesen, textIndex, bereicheFinden, artikelDarstellen, fundDarstellen,
-    tagesschauVideos, untertitelLesen, transkriptText, redezeit } = globalThis.WA_GEMEINSAM;
+    tagesschauVideos, untertitelLesen, transkriptText, redezeit, beitraegeBerechnen, beitraegeDarstellen,
+    youtubeAbschnitte, youtubeAbsaetze, youtubeText, absatzEtikett } = globalThis.WA_GEMEINSAM;
 
   // ------------------------------------------------------------ Artikeltext
 
@@ -206,7 +207,9 @@
   host.id = "wa-host";
   host.style.cssText = "all: initial; position: fixed; top: 0; right: 0; z-index: 2147483647;";
   const schatten = host.attachShadow({ mode: "open" });
-  schatten.innerHTML = `<style>
+  // Gerüst ohne innerHTML: Seiten mit Trusted Types (YouTube) blockieren HTML aus Zeichenketten
+  const stil = document.createElement("style");
+  stil.textContent = `
     :host { all: initial; }
     * { box-sizing: border-box; }
     .leiste { position: fixed; top: 0; right: 0; width: min(380px, 92vw); height: 100vh; background: #fff; color: #1b1b1b;
@@ -297,6 +300,12 @@
     .fundliste .leiter .pol { color: #999; font-weight: 700; }
     .fundliste .stufe { border: 1px solid #ccc; border-radius: 4px; padding: 0 5px; color: #555; }
     .fundliste .stufe.neutral { border-color: #2f9e44; color: #1e7b34; }
+    .artikel .beitrag-kopf { font: 600 12.5px system-ui, "Segoe UI", sans-serif; color: #1c5fa8; border-top: 1px solid #b6d4f2;
+      padding-top: 6px; margin: 12px 0 6px; }
+    .beitrag { padding: 6px 4px; border-bottom: 1px solid #eee; }
+    .beitrag:hover { background: #f4f4f4; }
+    .beitrag-titel b { font-size: 13px; }
+    .ohne-ut { color: #888; }
     .fundliste .stufe.gewaehlt { background: #1b1b1b; border-color: #1b1b1b; color: #fff; font-weight: 600; }
     /* Handy: Leiste als Bereich am unteren Rand, einklappbar auf die Kopfzeile */
     @media (max-width: 640px) {
@@ -313,39 +322,65 @@
       .klein { font-size: 13px; }
       .tip { font-size: 14px; }
     }
-  </style>
-  <div class="leiste">
-    <header>
-      <h1 id="titel">Wertungsanalyse</h1>
-      <label class="schalter" title="Markierungen im Artikel ein- oder ausblenden"><input type="checkbox" id="an" checked><span> Markierungen</span></label>
-      <button id="pdf" title="Bericht als PDF (öffnet die Druckansicht in einem neuen Tab)" disabled>PDF</button>
-      <button id="neu" title="Neu analysieren (kostet einen API-Aufruf)">↻</button>
-      <button id="einst" title="Einstellungen">⚙</button>
-      <button id="klapp" title="Leiste ein- oder ausklappen">▾</button>
-      <button id="zu" title="Leiste schließen (Klick aufs Symbol öffnet sie wieder)">✕</button>
-    </header>
-    <div class="inhalt" id="inhalt"></div>
-  </div>
-  <div class="tip" id="tip" hidden></div>`;
+  `;
+  const knopf = (id, titel, text, extra = {}) => {
+    const b = document.createElement("button");
+    b.id = id; b.title = titel; b.textContent = text;
+    if (extra.disabled) b.disabled = true;
+    return b;
+  };
+  const kopf = document.createElement("header");
+  const kopfTitel = document.createElement("h1");
+  kopfTitel.id = "titel"; kopfTitel.textContent = "Wertungsanalyse";
+  const schalter = document.createElement("label");
+  schalter.className = "schalter"; schalter.title = "Markierungen im Artikel ein- oder ausblenden";
+  const anKasten = document.createElement("input");
+  anKasten.type = "checkbox"; anKasten.id = "an"; anKasten.checked = true;
+  const anText = document.createElement("span");
+  anText.textContent = " Markierungen";
+  schalter.append(anKasten, anText);
+  kopf.append(kopfTitel, schalter,
+    knopf("pdf", "Bericht als PDF (öffnet die Druckansicht in einem neuen Tab)", "PDF", { disabled: true }),
+    knopf("neu", "Neu analysieren (kostet einen API-Aufruf)", "↻"),
+    knopf("einst", "Einstellungen", "⚙"),
+    knopf("klapp", "Leiste ein- oder ausklappen", "▾"),
+    knopf("zu", "Leiste schließen (Klick aufs Symbol öffnet sie wieder)", "✕"));
+  const leisteEl = document.createElement("div");
+  leisteEl.className = "leiste";
+  const inhaltEl = document.createElement("div");
+  inhaltEl.className = "inhalt"; inhaltEl.id = "inhalt";
+  leisteEl.append(kopf, inhaltEl);
+  const tipEl = document.createElement("div");
+  tipEl.className = "tip"; tipEl.id = "tip"; tipEl.hidden = true;
+  schatten.append(stil, leisteEl, tipEl);
   document.documentElement.appendChild(host);
 
   const $ = (id) => schatten.getElementById(id);
   const leiste = schatten.querySelector(".leiste");
   let zustand = { ergebnis: null, karte: null, laeuft: false, port: null, text: "", spiegel: null, spiegelLaeuft: false,
-    videos: [], video: null, url: location.href };
+    videos: [], video: null, yt: false, url: location.href, seite: location.href };
 
   const inhaltSetzen = (...kinder) => $("inhalt").replaceChildren(...kinder);
 
   $("zu").addEventListener("click", () => { leiste.hidden = true; });
   $("einst").addEventListener("click", () => chrome.runtime.sendMessage({ art: "einstellungen_oeffnen" }));
-  $("neu").addEventListener("click", () => starten({ neu: true, video: zustand.video }));
+  $("neu").addEventListener("click", () => starten({ neu: true, video: zustand.video, yt: zustand.yt }));
   $("pdf").addEventListener("click", berichtOeffnen);
   $("an").addEventListener("change", (e) => {
     document.documentElement.classList.toggle("wa-aus", !e.target.checked);
     if (!e.target.checked) $("tip").hidden = true;
   });
 
-  WA.klick = () => { leiste.hidden = !leiste.hidden; };
+  WA.klick = () => {
+    if (location.href !== zustand.seite && !zustand.laeuft) {
+      zustand.seite = location.href;
+      zustand.ergebnis = null; zustand.spiegel = null; zustand.text = "";
+      leiste.hidden = false;
+      beginnen();
+      return;
+    }
+    leiste.hidden = !leiste.hidden;
+  };
 
   // Handy: Leiste auf die Kopfzeile einklappen, damit der Artikel mit Markierungen lesbar bleibt
   const schmal = () => window.matchMedia("(max-width: 640px)").matches;
@@ -376,7 +411,12 @@
   // ------------------------------------------------------------ Ablauf
 
   // Seiten mit ARD-Player und Untertiteln (tagesschau.de): zuerst die Auswahl zeigen, sonst gleich den Artikel analysieren
+  // YouTube-Watch-Seite: am Hostnamen oder an der Seitenkennung (auch Varianten wie m.youtube.com)
+  const istYoutube = () => location.pathname === "/watch" && (/(^|\.)youtube\.com$/.test(location.hostname)
+    || (document.querySelector('meta[property="og:site_name"]') || {}).content === "YouTube");
+
   function beginnen() {
+    if (istYoutube()) { youtubeZeigen(); return; }
     zustand.videos = tagesschauVideos(document);
     if (zustand.videos.length) auswahlZeigen(); else starten();
   }
@@ -390,10 +430,23 @@
     inhaltSetzen(
       el("section", {}, el("h2", {}, "Fernsehbeiträge auf dieser Seite"),
         el("div", { class: "klein" }, "Analysiert wird der Text der Untertitel, je Sprecherwechsel ein Absatz, mit gemessener Redezeit "
-          + "der O-Töne. Bilder, Einblendungen und Tonfall fehlen. Einzelne Beiträge sind die bessere Einheit als eine ganze Sendung."),
-        el("ul", {}, zustand.videos.map((v) => el("li", { class: "fund", onclick: () => starten({ video: v }) },
-          el("span", {}, el("b", {}, v.titel), " ›",
-            el("div", { class: "klein" }, [dauer(v.dauer_s), v.datum].filter(Boolean).join(" · ") || "Video mit Untertiteln")))))),
+          + "der O-Töne. Eine ganze Sendung wird in ihre Beiträge geteilt, mit Sendezeit und Werten je Beitrag. "
+          + "Bilder, Einblendungen und Tonfall fehlen."),
+        el("ul", {}, zustand.videos.map((v) => v.untertitel
+          ? el("li", { class: "fund", onclick: () => starten({ video: v }) },
+            el("span", {}, el("b", {}, v.titel), " ›",
+              el("div", { class: "klein" }, [dauer(v.dauer_s), v.datum, v.themen.length > 1 ? `${v.themen.length} Themen` : ""]
+                .filter(Boolean).join(" · ") || "Video mit Untertiteln")))
+          : el("li", { class: "fund fehlt ohne-ut" },
+            el("span", {}, v.titel, el("div", { class: "klein" },
+              [dauer(v.dauer_s), v.datum ? `gesendet ${v.datum}` : "", "keine Untertitel"].filter(Boolean).join(" · ")))))),
+        zustand.videos.some((v) => !v.untertitel) && el("div", { class: "warn" },
+          (zustand.videos.every((v) => !v.untertitel) ? "Für die Videos dieser Seite" : "Für einige Videos")
+          + " stellt tagesschau.de keine Untertitel bereit; ohne Text lässt sich nichts analysieren. "
+          + "Ihr Text steckt meist in der ganzen Sendung desselben Tages, die das Addon in Beiträge teilt: ",
+          el("a", { href: "https://www.tagesschau.de/multimedia/sendung/tagesschau_20_uhr", target: "_blank", rel: "noopener" }, "tagesschau 20 Uhr"),
+          " · ",
+          el("a", { href: "https://www.tagesschau.de/multimedia/sendung/tagesthemen", target: "_blank", rel: "noopener" }, "tagesthemen"), ".")),
       el("section", {}, el("h2", {}, "Artikeltext"),
         el("div", { class: "klein" }, "Statt eines Videos den Text dieser Seite analysieren, wie auf anderen Nachrichtenseiten."),
         el("button", { style: "margin-top:6px", onclick: () => starten() }, "Text der Seite analysieren")));
@@ -402,13 +455,86 @@
   // Trägt ein anderes Video der Seite den Hinweis „live untertitelt“, gilt er auch für die daraus geschnittenen
   // Einzelbeiträge (wie in tagesschau.py). Höchstens zwei weitere Dateien, Fehler zählen als „nicht live“.
   async function seiteLiveUntertitelt(video) {
-    for (const v of zustand.videos.filter((x) => x !== video).slice(0, 2)) {
+    for (const v of zustand.videos.filter((x) => x !== video && x.untertitel).slice(0, 2)) {
       try {
         const a = await fetch(v.untertitel, { credentials: "omit" });
         if (a.ok && untertitelLesen(await a.text()).live) return true;
       } catch { /* weiter */ }
     }
     return false;
+  }
+
+  // ------------------------------------------------------------ YouTube
+
+  const ytTitel = () => ((document.querySelector("ytd-watch-metadata h1, h1.ytd-watch-metadata, #title h1") || {}).textContent || "")
+    .trim() || document.title.replace(/\s*-\s*YouTube\s*$/, "").trim();
+  const ytKanal = () => ((document.querySelector("ytd-watch-metadata ytd-channel-name a, #owner ytd-channel-name a, ytd-channel-name a") || {})
+    .textContent || "").trim();
+
+  function youtubeZeigen(meldung) {
+    if (zustand.laeuft) return;
+    leiste.hidden = false;
+    $("pdf").disabled = true;
+    markierungenEntfernen();
+    inhaltSetzen(el("section", {}, el("h2", {}, "YouTube-Video"),
+      el("div", { class: "gross" }, ytTitel()),
+      ytKanal() && el("div", { class: "klein" }, `Kanal: ${ytKanal()}`),
+      meldung && el("div", { class: "warn" }, meldung),
+      el("div", { class: "klein", style: "margin-top:6px" }, "Analysiert wird das YouTube-Transkript. Es ist meist automatisch erzeugt: "
+        + "Hörfehler bei Namen sind möglich, Sprecherwechsel fehlen, deshalb gibt es keine Redezeit je Stimme. "
+        + "Eine ganze Sendung wird trotzdem in Beiträge geteilt."),
+      el("button", { style: "margin-top:8px", onclick: () => starten({ yt: true }) }, "Transkript einlesen und analysieren")));
+  }
+
+  // Öffnet „Transkript anzeigen“ (dazu, falls nötig, die Beschreibung) und wartet, bis Abschnitte da sind
+  async function youtubeTranskriptOeffnen() {
+    const warten = async (ms) => {
+      for (let t = 0; t < ms; t += 250) {
+        if (youtubeAbschnitte(document).length) return true;
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      return youtubeAbschnitte(document).length > 0;
+    };
+    if (youtubeAbschnitte(document).length) return true;
+    // YouTube hält mehrere Fassungen der Beschreibung im Dokument; nur die sichtbare reagiert
+    const sichtbar = (e) => e.getBoundingClientRect().width > 0;
+    // Nur echte <button>: die umhüllende Komponente ytd-button-renderer trägt denselben Text, reagiert aber nicht auf click()
+    const knoepfe = () => [...document.querySelectorAll("button")]
+      .filter((b) => /^(Transkript anzeigen|Show transcript)$/i.test((b.getAttribute("aria-label") || b.textContent || "").trim()));
+    // Nach dem Aufklappen zeichnet YouTube die Schaltfläche verzögert: auf die sichtbare warten
+    const sichtbarerKnopf = async (ms) => {
+      for (let t = 0; t < ms; t += 200) {
+        const k = knoepfe().find(sichtbar);
+        if (k) return k;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      return null;
+    };
+    let k = knoepfe().find(sichtbar);
+    if (!k) {
+      const mehr = [...document.querySelectorAll("#description-inline-expander #expand, ytd-text-inline-expander #expand, tp-yt-paper-button#expand")]
+        .find(sichtbar);
+      if (mehr) mehr.click();
+      k = await sichtbarerKnopf(3000);
+    }
+    (k || knoepfe()[0])?.click();
+    if (await warten(5000)) return true;
+    const nochmal = knoepfe().find(sichtbar);
+    if (nochmal) { nochmal.click(); return warten(6000); }
+    return false;
+  }
+
+  async function youtubeTranskript() {
+    if (!(await youtubeTranskriptOeffnen())) return null;
+    const dauer = (document.querySelector("video") || {}).duration;
+    const { teile, zeilen } = youtubeAbsaetze(youtubeAbschnitte(document), Number.isFinite(dauer) ? dauer : null);
+    if (!teile.length) return null;
+    const v = new URLSearchParams(location.search).get("v");
+    const url = v ? `https://www.youtube.com/watch?v=${v}` : location.href;
+    const video = { titel: ytTitel(), kanal: ytKanal() };
+    return { url, text: youtubeText(url, video, teile),
+      tv: { quelle: "youtube", titel: video.titel, kanal: video.kanal, sprecher: false, live: false, themen: [],
+        absaetze: teile.map(({ nr, beginn, ende, sekunden }) => ({ nr, farbe: null, beginn, ende, sekunden })), zeilen } };
   }
 
   // Eigene Adresse je Video für den Zwischenspeicher (Seite + Name der Untertiteldatei)
@@ -419,24 +545,37 @@
     return u.toString();
   }
 
-  async function starten({ neu = false, ganzeSeite = false, video = null } = {}) {
+  async function starten({ neu = false, ganzeSeite = false, video = null, yt = false } = {}) {
     if (zustand.laeuft) return;
     leiste.hidden = false;
     $("pdf").disabled = true;
     zustand.video = video;
+    zustand.yt = yt;
     let text, tv = null, url = location.href;
-    if (video) {
+    if (yt) {
+      zustand.laeuft = true;
+      ladenZeigen({ phase: "Transkript wird gelesen", sekunden: 0 });
+      const r = await youtubeTranskript();
+      zustand.laeuft = false;
+      if (!r) {
+        youtubeZeigen("Kein Transkript gefunden. Bitte unter dem Video die Beschreibung aufklappen („…mehr“), "
+          + "„Transkript anzeigen“ wählen und dann erneut auf den Knopf klicken. Manche Videos haben kein Transkript.");
+        return;
+      }
+      ({ text, tv, url } = r);
+    } else if (video) {
       zustand.laeuft = true;
       ladenZeigen({ phase: "Untertitel werden geladen", sekunden: 0 });
       try {
         const antwort = await fetch(video.untertitel, { credentials: "omit" });
         if (!antwort.ok) throw new Error(`HTTP ${antwort.status}`);
-        const { teile, live: eigenLive } = untertitelLesen(await antwort.text());
+        const { teile, live: eigenLive, zeilen: utZeilen } = untertitelLesen(await antwort.text());
         if (!teile.length) throw new Error("keine Untertitelzeilen");
         const live = eigenLive || await seiteLiveUntertitelt(video);
         text = transkriptText(location.href, video, teile, live);
-        tv = { titel: video.titel, untertitel: video.untertitel, datum: video.datum, live,
-          absaetze: teile.map(({ nr, farbe, beginn, ende, sekunden }) => ({ nr, farbe, beginn, ende, sekunden })) };
+        tv = { titel: video.titel, untertitel: video.untertitel, datum: video.datum, live, themen: video.themen || [],
+          absaetze: teile.map(({ nr, farbe, beginn, ende, sekunden }) => ({ nr, farbe, beginn, ende, sekunden })),
+          zeilen: utZeilen };
         url = videoAdresse(video);
       } catch (e) {
         zustand.laeuft = false;
@@ -496,7 +635,7 @@
     if (code === "kein_artikel") {
       knoepfe.push(el("button", { onclick: () => starten({ ganzeSeite: true }) }, "Ganze Seite analysieren"));
     } else {
-      knoepfe.push(el("button", { onclick: () => starten({ video: zustand.video }) }, "Noch einmal"));
+      knoepfe.push(el("button", { onclick: () => starten({ video: zustand.video, yt: zustand.yt }) }, "Noch einmal"));
     }
     if (zustand.videos.length) knoepfe.push(el("button", { onclick: auswahlZeigen }, "Zur Videoauswahl"));
     inhaltSetzen(el("div", { class: "fehler" }, el("b", {}, titel), el("div", {}, text),
@@ -523,11 +662,17 @@
       GATTUNG_KOMMENTAR.has(a.gattung.art) && el("div", { class: "klein", style: "margin-top:4px" }, "Bei Meinungstexten ist Wertung Teil der Gattung, kein Fehler."),
       a.kennzeichnungsproblem.vorhanden && el("div", { class: "warn" }, el("b", {}, "Kennzeichnungsproblem: "), a.kennzeichnungsproblem.begruendung),
       textlage && el("div", { class: "warn" }, textlage),
-      tv && el("div", { class: "tv" }, el("b", {}, `Fernsehbeitrag „${tv.titel}“: `),
+      tv && tv.quelle === "youtube" && el("div", { class: "tv" }, el("b", {}, `YouTube-Video „${tv.titel}“`),
+        tv.kanal ? ` (${tv.kanal}): ` : ": ",
+        "Text aus dem YouTube-Transkript, meist automatisch erzeugt. Hörfehler sind möglich, Sprecherwechsel fehlen; "
+        + "die Absätze sind Zeitabschnitte, deshalb gibt es keine Redezeit je Stimme. Bilder und Tonfall sind nicht berücksichtigt."),
+      tv && tv.quelle !== "youtube" && el("div", { class: "tv" }, el("b", {}, `Fernsehbeitrag „${tv.titel}“: `),
         `Text aus den ${tv.live ? "Live-Untertiteln" : "Untertiteln"}, je Sprecherwechsel ein Absatz. `
         + "Bilder, Einblendungen und Tonfall sind nicht berücksichtigt; Namen erschließt die Analyse aus dem Text.",
         zustand.videos.length > 1 && el("div", { style: "margin-top:6px" },
           el("button", { onclick: auswahlZeigen }, "Anderes Video dieser Seite")))));
+
+    if (tv) abschnitte.push(beitraegeAbschnitt(a, tv));
 
     // Kennzahl
     const k = kennzahlText(a.kennzahl);
@@ -784,16 +929,31 @@
   const vorhanden = (index, zitat) => (zustand.ergebnis && zustand.ergebnis.tv ? true : !!stelleFinden(index, zitat));
   const stelleAnzeigen = (zitat) => (zustand.ergebnis && zustand.ergebnis.tv ? transkriptZeigen(zitat) : stelleZeigen(zitat));
 
+  // Beiträge einer ganzen Sendung: Thema, Art, Sendezeit, Werte und O-Ton je Beitrag; Klick springt zum Trennkopf
+  function beitraegeAbschnitt(a, tv) {
+    const bt = beitraegeBerechnen(zeilenLesen(zustand.text), a, tv);
+    if (!bt) return null;
+    return el("section", {}, el("h2", {}, `Beiträge der Sendung (${bt.liste.length})`),
+      el("div", { class: "klein" }, "Sendezeit aus den Untertitelzeiten, Werte je Beitrag aus der Analyse "
+        + "(W Wortwahl, E Rahmung, Q Quellen, A Auswahl, Ü Überschrift/Anmoderation, 0–4)."),
+      beitraegeDarstellen(bt.liste, (b) => beitragZeigen(b.nr)));
+  }
+
+  function beitragZeigen(nr) {
+    const ziel = schatten.querySelector(`#transkript .beitrag-kopf[data-beitrag="${nr}"]`);
+    if (!ziel) return;
+    if (leiste.classList.contains("eingeklappt")) einklappen(false);
+    ziel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   function transkriptAbschnitte(a, tv) {
-    const zeilen = zeilenLesen(zustand.text);
+    const basis = zeilenLesen(zustand.text);
+    const bt = beitraegeBerechnen(basis, a, tv);
+    const zeilen = bt ? bt.zeilen : basis;
     const index = textIndex(zeilen);
     const tk = bereicheFinden(index, a.markierungen);
     const rz = redezeit(a.stimmen, tv);
-    const etikett = (z) => {
-      const sprecher = rz && rz.absatzStimme.get(z.nr);
-      if (!sprecher) return { text: `${z.nr} · Sprechertext`, oton: false };
-      return { text: `${z.nr} · ${/O-Ton/i.test(sprecher) ? sprecher : "O-Ton " + sprecher}`, oton: true };
-    };
+    const etikett = (z) => absatzEtikett(z, rz, tv);
     const fehlend = tk.gefunden.filter((x) => !x).length;
     return [
       el("section", { id: "transkript" }, el("h2", {}, "Transkript mit Markierungen"),

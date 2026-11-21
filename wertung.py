@@ -159,6 +159,9 @@ def pruefen(analyse: dict, artikeltext: str) -> dict:
         "stimmen_ohne_aussage": [x["sprecher"] for x in st["liste"] if x["aussagen"] < 1],
         "stimmen_aussagen_ueber_gesamt": sum(x["aussagen"] for x in st["liste"]) > k["gesamt"] > 0,
         "ohne_stimme_zu_viele": len(st["ohne_stimme"]) > MAX_OHNE_STIMME,
+        "beitraege_beginn_nicht_gefunden": [b["beginn"] for b in analyse.get("beitraege") or []
+                                            if not normalisieren(b["beginn"]) or normalisieren(b["beginn"]) not in norm],
+        "beitraege_beginn_zu_lang": [b["beginn"] for b in analyse.get("beitraege") or [] if len(b["beginn"].split()) > 10],
         "stimmen_absatz_unbekannt": sorted(n for n in vergeben if n not in vorhanden),
         "stimmen_absatz_doppelt": sorted(n for n, k in vergeben.items() if k > 1),
     }

@@ -225,11 +225,13 @@ globalThis.WA_GEMEINSAM = (() => {
         pos = s.bis;
       }
       kinder.push(z.text.slice(pos));
+      if (z.art === "Beitrag") return el("div", { class: "beitrag-kopf", "data-beitrag": String(z.nr) }, z.text);
       if (z.art === "Überschrift") return el("div", { class: "ueberschrift" }, kinder);
       if (z.art === "Zwischenüberschrift") return el("p", { class: "zwischen" }, kinder);
       if (z.art === "Absatz") {
         const e = etikett(z);
-        return el("p", { class: "absatz" + (e.oton ? " oton" : "") }, el("span", { class: "markenname" }, e.text || e), kinder);
+        const name = (e.text || e) + (z.fortsetzung ? " (Forts.)" : "");
+        return el("p", { class: "absatz" + (e.oton ? " oton" : "") }, el("span", { class: "markenname" }, name), kinder);
       }
       const klasse = z.art === "Vorspann" || z.art === "Unterzeile" ? "vorspann" : NEBENTEXT.has(z.art) ? "nebentext" : "";
       return el("p", { class: klasse }, z.art && el("span", { class: "markenname" }, z.art), kinder);
@@ -273,23 +275,34 @@ globalThis.WA_GEMEINSAM = (() => {
   const LIVE = /Diese Sendung wurde[^.()]*?live untertitelt/i;
   const VERMERK_UT = /^\s*(Copyright|©)\s*Untertitel/i;
 
-  // Videos der Seite mit deutschen Untertiteln (EBU-TT) aus den Player-Daten (Attribut data-v)
+  // Videos der Seite aus den Player-Daten (Attribut data-v). untertitel = Adresse der deutschen Untertitel (EBU-TT)
+  // oder null, wenn tagesschau.de für das Video keine bereitstellt. themen = Themenliste einer Sendung (meta.synopsis).
   function tagesschauVideos(doc) {
     const gefunden = [], gesehen = new Set();
     for (const e of doc.querySelectorAll("[data-v]")) {
       let daten;
       try { daten = JSON.parse(e.getAttribute("data-v")); } catch { continue; }
-      const mc = (daten && daten.mc) || {};
+      const mc = daten && daten.mc;
+      if (!mc || !mc.meta) continue;
       const quelle = (mc.subtitles || []).filter((u) => u.languageCode === "de")
         .flatMap((u) => u.sources || []).find((q) => q.kind === "ebutt" && q.url);
-      if (!quelle || gesehen.has(quelle.url)) continue;
-      gesehen.add(quelle.url);
+      const titel = mc.meta.title || "ohne Titel";
+      const schluessel = quelle ? quelle.url : "ohne:" + titel;
+      if (gesehen.has(schluessel)) continue;
+      gesehen.add(schluessel);
       const clip = ((((mc.pluginData || {})["trackingAgf@all"] || {}).clipData) || {}).title || "";
       const datum = clip.match(/(\d{4})\.(\d{2})\.(\d{2})/);
-      gefunden.push({ titel: (mc.meta && mc.meta.title) || "ohne Titel", dauer_s: (mc.meta && mc.meta.durationSeconds) || null,
-        untertitel: quelle.url, datum: datum ? `${datum[3]}.${datum[2]}.${datum[1]}` : null });
+      gefunden.push({ titel, dauer_s: mc.meta.durationSeconds || null, untertitel: quelle ? quelle.url : null,
+        datum: datum ? `${datum[3]}.${datum[2]}.${datum[1]}` : null, themen: themenListe(mc.meta.synopsis) });
     }
     return gefunden;
+  }
+
+  // "Thema A, Thema B: Zusatz, Thema C" → Liste; getrennt nur an Kommas vor einem neuen Thema (Großbuchstabe, Ziffer, #, Anführung)
+  function themenListe(synopsis) {
+    const t = String(synopsis || "").replace(/^\s*Themen der Sendung:\s*/i, "").trim();
+    if (!t || !t.includes(",")) return [];
+    return t.split(/,\s+(?=[A-ZÄÖÜ0-9#„"»])/).map((x) => x.trim()).filter(Boolean);
   }
 
   // "00:15:31.920" oder "00:15:31:12" (Bilder bei 25/s) in Sekunden
@@ -317,17 +330,21 @@ globalThis.WA_GEMEINSAM = (() => {
       if (VERMERK_UT.test(ganz)) continue;
       for (const [stil, t] of stuecke) zeilen.push({ stil, t, beginn: sekunden(p.getAttribute("begin")), ende: sekunden(p.getAttribute("end")) });
     }
-    const teile = [];
+    const teile = [], ut = [];
     for (const z of zeilen) {
       const text = z.t.replace(GERAEUSCH, " ").replace(/\s+/g, " ").trim();
       if (!text) continue;
       const farbe = FARBE[z.stil] || z.stil || "ohne";
       const letzter = teile[teile.length - 1];
-      if (letzter && letzter.farbe === farbe) { letzter.text += " " + text; letzter.ende = z.ende; }
+      let von = 0;
+      if (letzter && letzter.farbe === farbe) { von = letzter.text.length + 1; letzter.text += " " + text; letzter.ende = z.ende; }
       else teile.push({ farbe, beginn: z.beginn, ende: z.ende, text });
+      // Untertitelzeile: Absatz (Index, später Nummer), Zeit und Stelle im Absatztext (für Beitragsgrenzen)
+      ut.push({ absatz: teile.length - 1, beginn: z.beginn, ende: z.ende, von, bis: von + text.length });
     }
     teile.forEach((t, i) => { t.nr = i + 1; t.sekunden = Math.round((t.ende - t.beginn) * 10) / 10; });
-    return { teile, live };
+    for (const u of ut) u.absatz = teile[u.absatz].nr;
+    return { teile, live, zeilen: ut };
   }
 
   // Text für die Analyse: Herkunft, Titel, je Sprecherwechsel ein Absatz mit Marke [Absatz N]
@@ -335,13 +352,14 @@ globalThis.WA_GEMEINSAM = (() => {
     const quelle = `Quelle: tagesschau.de, Video „${video.titel}“` + (video.datum ? ` vom ${video.datum}` : "") + ". Text aus den "
       + (live ? "Live-Untertiteln (können gekürzt oder umformuliert sein)" : "Untertiteln")
       + ". Fernsehbeitrag: Jeder Absatz [Absatz N] ist ein Sprecherwechsel (an der Untertitelfarbe erkannt); "
-      + "Bilder, Grafiken und Namenseinblendungen fehlen.";
+      + "Bilder, Grafiken und Namenseinblendungen fehlen."
+      + (video.themen && video.themen.length > 1 ? ` Themen der Sendung laut tagesschau.de: ${video.themen.join("; ")}.` : "");
     return [`URL: ${seite}`, quelle, video.titel, ...teile.map((t) => `[Absatz ${t.nr}] ${t.text}`)].join("\n");
   }
 
   // Redezeit aus den O-Ton-Absätzen je Stimme (Feld absaetze) und den Zeiten der Untertitel
   function redezeit(stimmen, tv) {
-    if (!tv || !Array.isArray(tv.absaetze) || !stimmen) return null;
+    if (!tv || tv.sprecher === false || !Array.isArray(tv.absaetze) || !stimmen) return null;
     const dauer = new Map(tv.absaetze.map((a) => [a.nr, a.sekunden || 0]));
     const vergeben = new Set();
     const jeStimme = stimmen.liste.map((s) => {
@@ -365,8 +383,154 @@ globalThis.WA_GEMEINSAM = (() => {
       absatzStimme: new Map(jeStimme.flatMap((s) => s.absaetze.map((n) => [n, s.sprecher]))) };
   }
 
+  const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+
+  // ------------------------------------------------------------ YouTube: Transkript aus dem Feld „Transkript anzeigen“
+
+  // "1:02:03" / "2:05" → Sekunden
+  function zeitmarke(t) {
+    const teile = String(t || "").trim().split(":").map(Number);
+    if (!teile.length || teile.some((x) => Number.isNaN(x))) return null;
+    return teile.reduce((s, x) => s * 60 + x, 0);
+  }
+
+  // Abschnitte des geöffneten Transkriptfelds (neue und ältere Darstellung, Desktop und Mobil): [{beginn, text}]
+  function youtubeAbschnitte(doc) {
+    const neu = [...doc.querySelectorAll("transcript-segment-view-model")].map((s) => ({
+      beginn: zeitmarke((s.querySelector('[class*="SegmentViewModelTimestamp"]:not([class*="A11y"])') || {}).textContent),
+      text: ((s.querySelector('[role="text"], .ytAttributedStringHost') || {}).textContent || "").trim() }));
+    const alt = [...doc.querySelectorAll("ytd-transcript-segment-renderer, ytm-transcript-segment-renderer")].map((s) => ({
+      beginn: zeitmarke((s.querySelector(".segment-timestamp") || {}).textContent),
+      text: ((s.querySelector(".segment-text, yt-formatted-string") || {}).textContent || "").trim() }));
+    return (neu.length ? neu : alt).filter((a) => a.beginn != null && a.text);
+  }
+
+  // Abschnitte → Absätze von etwa 20–45 s, möglichst an Satzenden. Absätze sind Zeitabschnitte, keine Sprecherwechsel.
+  function youtubeAbsaetze(abschnitte, dauer) {
+    const teile = [], ut = [];
+    abschnitte.forEach((a, i) => {
+      const ende = i + 1 < abschnitte.length ? abschnitte[i + 1].beginn : (dauer || a.beginn + 8);
+      const text = a.text.replace(/\s+/g, " ").replace(/\[[^\]]{1,25}\]/g, " ").trim();
+      if (!text) return;
+      let t = teile[teile.length - 1];
+      const voll = t && (ende - t.beginn > 45 || (t.ende - t.beginn >= 20 && /[.!?…]["“”»]?$/.test(t.text)));
+      let von = 0;
+      if (!t || voll) { t = { farbe: null, beginn: a.beginn, ende, text }; teile.push(t); }
+      else { von = t.text.length + 1; t.text += " " + text; t.ende = ende; }
+      ut.push({ absatz: teile.length, beginn: a.beginn, ende, von, bis: von + text.length });
+    });
+    teile.forEach((t, i) => { t.nr = i + 1; t.sekunden = Math.round((t.ende - t.beginn) * 10) / 10; });
+    return { teile, zeilen: ut };
+  }
+
+  function youtubeText(seite, video, teile) {
+    const quelle = `Quelle: YouTube, Video „${video.titel}“` + (video.kanal ? ` vom Kanal „${video.kanal}“` : "")
+      + ". Text aus dem YouTube-Transkript, meist automatisch erzeugt (Spracherkennung): Hörfehler besonders bei Namen möglich, "
+      + "keine Sprecherwechsel. Die Absätze [Absatz N] sind Zeitabschnitte, keine Sprecherwechsel; Bilder und Einblendungen fehlen.";
+    return [`URL: ${seite}`, quelle, video.titel, ...teile.map((t) => `[Absatz ${t.nr}] ${t.text}`)].join("\n");
+  }
+
+  // Etikett eines Transkript-Absatzes: O-Ton mit Sprecher, Sprechertext oder (ohne Sprecherwechsel) die Zeitmarke
+  function absatzEtikett(z, rz, tv) {
+    if (tv && tv.sprecher === false) {
+      const a = (tv.absaetze || []).find((x) => x.nr === z.nr);
+      return { text: a ? `${z.nr} · ${mmss(a.beginn)}` : `${z.nr}`, oton: false };
+    }
+    const sprecher = rz && rz.absatzStimme.get(z.nr);
+    if (!sprecher) return { text: `${z.nr} · Sprechertext`, oton: false };
+    return { text: `${z.nr} · ${/O-Ton/i.test(sprecher) ? sprecher : "O-Ton " + sprecher}`, oton: true };
+  }
+
+  const ART = { bericht: "Bericht", interview: "Interview", schaltgespraech: "Schaltgespräch", kommentar: "Kommentar",
+    meldung: "Meldung", sport: "Sport", wetter: "Wetter", sonstiges: "Sonstiges" };
+
+  // Teilt das Transkript an den Anfangszitaten der Beiträge (analyse.beitraege) und rechnet Sendezeit und Redezeit je Beitrag.
+  // Liefert die Zeilen mit eingefügten Trennköpfen (art "Beitrag") und die Liste der Beiträge; ohne Beiträge null.
+  function beitraegeBerechnen(zeilen, analyse, tv) {
+    const bt = (analyse && analyse.beitraege) || [];
+    if (!bt.length) return null;
+    const index = textIndex(zeilen);
+    const liste = bt.map((b, i) => {
+      const z = normalisieren(b.beginn || "").trim();
+      const pos = z ? index.text.indexOf(z) : -1;
+      return { ...b, nr: i + 1, gefunden: pos >= 0, zi: pos >= 0 ? index.zeile[pos] : -1, off: pos >= 0 ? index.off[pos] : -1 };
+    });
+    // Startzeit: Untertitelzeile, in der das Anfangszitat liegt
+    const ut = (tv && tv.zeilen) || [];
+    for (const b of liste) {
+      if (!b.gefunden) continue;
+      const zeile = zeilen[b.zi];
+      const kandidaten = zeile.art === "Absatz" ? ut.filter((u) => u.absatz === zeile.nr) : [];
+      const u = kandidaten.find((x) => b.off >= x.von && b.off <= x.bis) || kandidaten[0];
+      b.start = u ? u.beginn : null;
+    }
+    const gefunden = liste.filter((b) => b.gefunden).sort((x, y) => x.zi - y.zi || x.off - y.off);
+    const ende = ut.length ? ut[ut.length - 1].ende : null;
+    gefunden.forEach((b, i) => {
+      const naechster = gefunden[i + 1];
+      const bis = naechster ? naechster.start : ende;
+      b.dauer = b.start != null && bis != null ? Math.max(0, bis - b.start) : null;
+    });
+    const gesamt = gefunden.reduce((x, b) => x + (b.dauer || 0), 0);
+    for (const b of liste) b.anteil = gesamt && b.dauer != null ? Math.round(100 * b.dauer / gesamt) : null;
+
+    // Trennköpfe einfügen, von hinten, damit frühere Stellen gültig bleiben
+    const neu = zeilen.map((z) => ({ ...z }));
+    for (const b of [...gefunden].reverse()) {
+      const z = neu[b.zi];
+      const kopf = { art: "Beitrag", nr: b.nr, text: `Beitrag ${b.nr} · ${b.thema}` + (b.dauer != null ? ` · ${mmss(b.dauer)} min` : "") };
+      const teile = [];
+      if (b.off > 0) teile.push({ ...z, text: z.text.slice(0, b.off).trimEnd() });
+      teile.push(kopf, { ...z, text: z.text.slice(b.off), fortsetzung: b.off > 0 });
+      neu.splice(b.zi, 1, ...teile);
+    }
+
+    // Absatz → Beitrag (nach seinem Anfang) und Redezeit der O-Töne je Beitrag und Position
+    const absatzBeitrag = new Map();
+    let aktuell = null;
+    for (const z of neu) {
+      if (z.art === "Beitrag") aktuell = z.nr;
+      else if (z.art === "Absatz" && !z.fortsetzung && !absatzBeitrag.has(z.nr)) absatzBeitrag.set(z.nr, aktuell);
+    }
+    const dauer = new Map(((tv && tv.absaetze) || []).map((a) => [a.nr, a.sekunden || 0]));
+    for (const b of liste) b.redezeit = new Map();
+    for (const s of (analyse.stimmen && analyse.stimmen.liste) || []) {
+      for (const n of s.absaetze || []) {
+        const b = liste.find((x) => x.nr === absatzBeitrag.get(n));
+        if (!b || !dauer.has(n)) continue;
+        const k = s.position.trim();
+        b.redezeit.set(k, (b.redezeit.get(k) || 0) + dauer.get(n));
+      }
+    }
+    return { zeilen: neu, liste };
+  }
+
+  // Übersicht der Beiträge (Leiste und Bericht); klick(b) springt zum Beitrag
+  function beitraegeDarstellen(liste, klick) {
+    const kurzWerte = (tw) => ["wortwahl", "epistemisch", "quellen", "auswahl", "ueberschrift"]
+      .map((d) => `${{ wortwahl: "W", epistemisch: "E", quellen: "Q", auswahl: "A", ueberschrift: "Ü" }[d]}${tw && tw[d] != null ? tw[d] : "–"}`).join(" ");
+    return liste.map((b) => {
+      const k = b.kennzahl || {};
+      const r = b.richtung || {};
+      const rz = [...(b.redezeit || new Map()).entries()].sort((x, y) => y[1] - x[1])
+        .map(([p, s]) => `${p} ${Math.round(s)} s`).join(" · ");
+      return el("div", { class: "beitrag", ...(klick ? { onclick: () => klick(b), style: "cursor:pointer" } : {}) },
+        el("div", { class: "beitrag-titel" }, el("b", {}, `${b.nr} · ${b.thema}`),
+          el("span", { class: "klein" }, " " + [ART[b.art] || b.art, b.dauer != null ? `${mmss(b.dauer)} min` : "",
+            b.anteil != null ? `${b.anteil} %` : ""].filter(Boolean).join(" · "))),
+        !["wetter", "sport"].includes(b.art) && el("div", { class: "klein" },
+          `${kurzWerte(b.teilwerte)} · ${k.markiert ?? "?"} von ${k.gesamt ?? "?"} Sätzen wertend`
+          + (k.strittig ? ` (+${k.strittig} strittig)` : "") + ` · ${RICHTUNG_KURZ[r.einordnung] || "?"}`
+          + (r.zugunsten && r.zugunsten.length ? ` zugunsten ${r.zugunsten.join(", ")}` : "")),
+        b.kurz && el("div", { class: "klein" }, b.kurz),
+        rz && el("div", { class: "klein" }, "O-Ton: " + rz),
+        !b.gefunden && el("div", { class: "klein" }, "⚠ Anfang nicht im Transkript gefunden, ohne Zeit"));
+    });
+  }
+
   return { DIM, MUSTER, STIMMEN_TYP, VERMERK, RICHTUNG, RICHTUNG_KURZ, TEXTLAGE, GATTUNG_KOMMENTAR, MIN_SAETZE_FUER_ANTEIL,
     STUFEN, zeichen, normalisieren, kennzahlText, spiegelVergleich, stimmenZaehlen, metaText, el,
     zeilenLesen, textIndex, bereicheFinden, artikelDarstellen, wortleiterBlock, fundDarstellen,
-    tagesschauVideos, untertitelLesen, transkriptText, redezeit };
+    tagesschauVideos, untertitelLesen, transkriptText, redezeit, beitraegeBerechnen, beitraegeDarstellen,
+    youtubeAbschnitte, youtubeAbsaetze, youtubeText, absatzEtikett };
 })();

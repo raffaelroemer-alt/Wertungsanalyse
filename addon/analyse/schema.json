@@ -1,7 +1,7 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["textlage", "gattung", "kennzeichnungsproblem", "markierungen", "teilwerte", "richtung", "strategische_muster", "stimmen", "kennzahl", "neutrale_fassung", "hinweise"],
+  "required": ["textlage", "gattung", "kennzeichnungsproblem", "markierungen", "teilwerte", "richtung", "strategische_muster", "stimmen", "beitraege", "kennzahl", "neutrale_fassung", "hinweise"],
   "properties": {
     "textlage": {
       "type": "string",
@@ -136,6 +136,49 @@
               "vermerk": {"type": "string", "enum": ["kein_vermerk", "angefragt_ohne_antwort", "aeusserung_abgelehnt"]}
             }
           }
+        }
+      }
+    },
+    "beitraege": {
+      "type": "array",
+      "description": "nur bei Transkripten einer ganzen Sendung, sonst leer",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["thema", "beginn", "art", "teilwerte", "kennzahl", "richtung", "kurz"],
+        "properties": {
+          "thema": {"type": "string"},
+          "beginn": {"type": "string", "description": "zeichengenau aus dem Text, erste Wörter des Beitrags, höchstens zehn Wörter"},
+          "art": {"type": "string", "enum": ["bericht", "interview", "schaltgespraech", "kommentar", "meldung", "sport", "wetter", "sonstiges"]},
+          "teilwerte": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["wortwahl", "epistemisch", "quellen", "auswahl", "ueberschrift"],
+            "properties": {
+              "wortwahl": {"type": "integer", "enum": [0, 1, 2, 3, 4]},
+              "epistemisch": {"type": "integer", "enum": [0, 1, 2, 3, 4]},
+              "quellen": {"type": "integer", "enum": [0, 1, 2, 3, 4]},
+              "auswahl": {"type": "integer", "enum": [0, 1, 2, 3, 4]},
+              "ueberschrift": {"type": "integer", "enum": [0, 1, 2, 3, 4]}
+            }
+          },
+          "kennzahl": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["markiert", "gesamt", "strittig"],
+            "properties": {"markiert": {"type": "integer"}, "gesamt": {"type": "integer"}, "strittig": {"type": "integer"}}
+          },
+          "richtung": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["einordnung", "zugunsten", "zulasten"],
+            "properties": {
+              "einordnung": {"type": "string", "enum": ["parteinahme", "zuspitzung_ohne_parteinahme", "keine_erkennbare_richtung"]},
+              "zugunsten": {"type": "array", "items": {"type": "string"}},
+              "zulasten": {"type": "array", "items": {"type": "string"}}
+            }
+          },
+          "kurz": {"type": "string"}
         }
       }
     },
